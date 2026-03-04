@@ -81,7 +81,6 @@ def check_server(url: str) -> dict:
         "online": False,
         "model": "Unknown",
         "context": 0,
-        "gpu_layers": "N/A",
     }
 
     try:
@@ -89,7 +88,14 @@ def check_server(url: str) -> dict:
             data = json.load(resp)
             if "data" in data and len(data["data"]) > 0:
                 result["online"] = True
-                result["model"] = data["data"][0].get("id", "Unknown")
+                model = data["data"][0]
+                result["model"] = model.get("id", "Unknown")
+
+                # Extract context size from model metadata
+                meta = model.get("meta", {})
+                if "n_ctx_train" in meta:
+                    ctx = meta["n_ctx_train"]
+                    result["context"] = f"{ctx:,}"
     except URLError:
         pass
     except Exception:
@@ -135,11 +141,7 @@ def main():
             </div>
             <div class="metric">
                 <span class="label">Context Size</span>
-                <span class="value">{server_info["context"]}</span>
-            </div>
-            <div class="metric">
-                <span class="label">GPU Layers</span>
-                <span class="value">{server_info["gpu_layers"]}</span>
+                <span class="value">{server_info["context"]} tokens</span>
             </div>
             <div class="metric">
                 <span class="label">GPU</span>
