@@ -51,7 +51,7 @@ Get GGUF models from HuggingFace (Recommended):
 **Models available from Unsloth.ai:**
 
 - [Qwen3-Coder-Next-80B](https://huggingface.co/unsloth/Qwen3-Coder-Next-GGUF) - Best for code generation
-- [Qwen2.5-Coder-32B](https://huggingface.co/unsloth/Qwen2.5-Coder-32B-GGUF) - Excellent coding + reasoning
+- [GLM-4.7-Flash](https://huggingface.co/unsloth/GLM-4.7-Flash-GGUF) - Balances performance and efficiency
 - [MiniMax-M2.5](https://huggingface.co/unsloth/MiniMax-M2.5-GGUF) - Best reasoning, compact
 
 **Recommended Models by Hardware:**
@@ -127,9 +127,9 @@ python scripts/llm-client.py -s "Tell me a story"
 │   (Server)          │   LAN   │   (Client)         │
 │                     │         │                     │
 │  ┌───────────────┐  │         │  ┌───────────────┐  │
-│  │ llama-server │◄─┼─────────┼─►│ llm-client.py │  │
-│  │ :8000/v1     │  │         │  │ or curl       │  │
-│  │ Metal GPU    │  │         │  │               │  │
+│  │ llama-server	 │◄─┼─────────┼─►│ llm-client.py │  │
+│  │ :8000/v1      │  │         │  │ or curl       │  │
+│  │ Metal GPU     │  │         │  │               │  │
 │  └───────────────┘  │         │  └───────────────┘  │
 └─────────────────────┘         └─────────────────────┘
 ```
@@ -165,7 +165,7 @@ export HF_HOME=~/custom-cache
 ### Save Default Config
 
 ```bash
-python scripts/llm-client.py --config -u http://192.168.1.x:8000/v1 -m qwen
+python scripts/llm-client.py --config -u http://192.168.1.x:8000/v1 -m unsloth_Qwen3-Coder-Next-GGUF_UD-IQ1_S.gguf
 ```
 
 ## Usage Examples
@@ -192,6 +192,7 @@ HF_HOME=/custom/cache ./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4
 ### CLI Client
 
 ```bash
+export LLM_SERVER_URL=http://192.168.1.x:8000/v1
 # Simple prompt
 python scripts/llm-client.py "Hello, write a hello world in Rust"
 
