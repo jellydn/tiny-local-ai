@@ -6,13 +6,6 @@ import os
 import sys
 from pathlib import Path
 
-try:
-    from openai import OpenAI
-except ImportError:
-    print("Error: openai package not installed")
-    print("Install with: pip install openai")
-    sys.exit(1)
-
 DEFAULT_URL = os.getenv("LLM_SERVER_URL", "http://localhost:8000/v1")
 DEFAULT_MODEL = os.getenv("LLM_MODEL", "qwen")
 
@@ -23,7 +16,7 @@ def get_config_path() -> Path:
     return config_dir / "config"
 
 
-def load_config() -> dict:
+def load_config() -> dict[str, str]:
     config_path = get_config_path()
     config = {}
     if config_path.exists():
@@ -60,12 +53,7 @@ def main():
         print(f"Config saved: url={args.url}, model={args.model}")
         return
 
-    if not args.prompt:
-        print('Usage: llm-client.py [-m MODEL] [-u URL] [-s] "your prompt"')
-        print("  or:  llm-client.py --config to save defaults")
-        print("")
-        print(f"Defaults: url={DEFAULT_URL}, model={DEFAULT_MODEL}")
-        sys.exit(1)
+    from openai import OpenAI
 
     client = OpenAI(base_url=args.url, api_key="sk-no-key")
 
