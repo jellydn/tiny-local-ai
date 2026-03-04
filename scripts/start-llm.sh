@@ -61,6 +61,32 @@ find_model() {
 	echo ""
 }
 
+resolve_hf_model() {
+	local model_ref="$1"
+	local cache_dir="${HF_HOME:-$HOME/Library/Caches/llama.cpp}"
+
+	local repo="${model_ref%%:*}"
+	local quant="${model_ref##*:}"
+
+	if [ "$quant" = "$repo" ]; then
+		quant="Q4_K_M"
+	fi
+
+	local model_path="${cache_dir}/${repo//\//_}_${quant}.gguf"
+	if [ -f "$model_path" ]; then
+		echo "$model_path"
+		return
+	fi
+
+	model_path="${cache_dir}/${repo//\//_}.gguf"
+	if [ -f "$model_path" ]; then
+		echo "$model_path"
+		return
+	fi
+
+	echo ""
+}
+
 check_llama_server() {
 	if command -v llama-server &>/dev/null; then
 		echo "llama-server"
@@ -87,17 +113,37 @@ echo "RAM: ${ram_gb}GB"
 CTX_SIZE=$(detect_context_size)
 echo "Context: $CTX_SIZE"
 
-MODEL_PATH=$(find_model "$MODEL_NAME")
-if [ -z "$MODEL_PATH" ]; then
-	echo "Error: Model not found: $MODEL_NAME"
-	echo "Searched in: $MODELS_DIR"
-	echo ""
-	echo "Available models:"
-	ls -la "$MODELS_DIR" 2>/dev/null || echo "  (directory empty)"
-	exit 1
+CACHE_DIR="${HF_HOME:-$HOME/Library/Caches/llama.cpp}"
+
+if [[ "$MODEL_NAME" == *"/"* ]]; then
+	echo "Model: $MODEL_NAME (HuggingFace)"
+	MODEL_PATH=$(resolve_hf_model "$MODEL_NAME")
+	HF_MODE=true
+
+	if [ -z "$MODEL_PATH" ]; then
+		echo "Model not found in cache: $MODEL_NAME"
+		echo "Cache dir: $CACHE_DIR"
+		echo ""
+		echo "Download first with:"
+		echo "  ./download-model.sh $MODEL_NAME"
+		exit 1
+	fi
+else
+	MODEL_PATH=$(find_model "$MODEL_NAME")
+	HF_MODE=false
+
+	if [ -z "$MODEL_PATH" ]; then
+		echo "Error: Model not found: $MODEL_NAME"
+		echo "Searched in: $MODELS_DIR"
+		echo ""
+		echo "Available models:"
+		ls -la "$MODELS_DIR" 2>/dev/null || echo "  (directory empty)"
+		exit 1
+	fi
 fi
 
 echo "Model path: $MODEL_PATH"
+echo "Cache dir: $CACHE_DIR"
 
 LLAMA_BIN=$(check_llama_server)
 if [ -z "$LLAMA_BIN" ]; then
@@ -116,14 +162,25 @@ fi
 
 echo "Starting server in tmux..."
 
-tmux new-session -d -s "$TMUX_SESSION" \
-	"$LLAMA_BIN" \
-	-m "$MODEL_PATH" \
-	--host "$HOST" \
-	--port "$PORT" \
-	--ctx-size "$CTX_SIZE" \
-	--n-gpu-layers 999 \
-	--log-disable
+if [ "$HF_MODE" = true ]; then
+	tmux new-session -d -s "$TMUX_SESSION" \
+		"$LLAMA_BIN" \
+		-hf "$MODEL_NAME" \
+		--host "$HOST" \
+		--port "$PORT" \
+		--ctx-size "$CTX_SIZE" \
+		--n-gpu-layers 999 \
+		--log-disable
+else
+	tmux new-session -d -s "$TMUX_SESSION" \
+		"$LLAMA_BIN" \
+		-m "$MODEL_PATH" \
+		--host "$HOST" \
+		--port "$PORT" \
+		--ctx-size "$CTX_SIZE" \
+		--n-gpu-layers 999 \
+		--log-disable
+fi
 
 sleep 2
 

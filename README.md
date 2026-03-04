@@ -44,6 +44,27 @@ mkdir -p ~/models/qwen
 # Move your downloaded .gguf file to ~/models/qwen/
 ```
 
+#### Download from HuggingFace (Alternative)
+
+You can also download models directly using the download script:
+
+```bash
+# Download with default quantization (Q4_K_M)
+./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF
+
+# Download specific quantization
+./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL
+```
+
+#### Custom Cache Location
+
+Set `HF_HOME` to change where models are cached (default: `~/Library/Caches/llama.cpp`):
+
+```bash
+export HF_HOME=/your/custom/path
+./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL
+```
+
 ### 3. Start Server (MacBook A)
 
 ```bash
@@ -86,6 +107,7 @@ python scripts/llm-client.py -s "Tell me a story"
 
 | Script               | Description                                   |
 | -------------------- | --------------------------------------------- |
+| `download-model.sh`  | Download GGUF models from HuggingFace         |
 | `start-llm.sh`       | Start LLM server with auto hardware detection |
 | `stop-llm.sh`        | Stop the LLM server                           |
 | `llm-client.py`      | CLI client for interacting with the server    |
@@ -102,8 +124,11 @@ export LLM_SERVER_URL=http://192.168.1.x:8000/v1
 # Model name (default: qwen)
 export LLM_MODEL=qwen
 
-# Models directory (default: ~/models)
+# Models directory for local GGUF files (default: ~/models)
 export MODELS_DIR=~/models
+
+# HuggingFace cache directory (default: ~/Library/Caches/llama.cpp)
+export HF_HOME=~/custom-cache
 ```
 
 ### Save Default Config
@@ -117,11 +142,17 @@ python scripts/llm-client.py --config -u http://192.168.1.x:8000/v1 -m qwen
 ### Server Management
 
 ```bash
-# Start with specific model
+# Start with local model (existing behavior)
 ./scripts/start-llm.sh qwen3-coder-next
+
+# Start with HuggingFace repo reference (auto-downloads if needed)
+./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL
 
 # Start with custom port
 PORT=8080 ./scripts/start-llm.sh qwen
+
+# Start with HuggingFace using custom cache location
+HF_HOME=/custom/cache ./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL
 
 # Stop server
 ./scripts/stop-llm.sh
