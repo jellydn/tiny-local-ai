@@ -117,9 +117,21 @@ def stop_server(process: Optional[subprocess.Popen]) -> None:
 
 
 def measure_prompt(
-    client: OpenAI, model_name: str, prompt: str, timeout: int = 300
+    client: OpenAI,
+    model_name: str,
+    prompt: str,
+    timeout: int = 300,
+    max_tokens: int = 512,
 ) -> Dict[str, Any]:
-    """Run a single prompt and measure latency metrics."""
+    """Run a single prompt and measure latency metrics.
+
+    Args:
+        client: OpenAI client instance
+        model_name: Name of the model to use
+        prompt: The prompt to send
+        timeout: Timeout in seconds
+        max_tokens: Maximum tokens to generate (default 512 for normalization)
+    """
     start_time = time.time()
     ttft = None
     token_count = 0
@@ -130,6 +142,7 @@ def measure_prompt(
             model=model_name,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
+            max_tokens=max_tokens,
             timeout=timeout,
         )
 
@@ -165,8 +178,18 @@ def run_benchmark_for_model(
     categories: Optional[List[str]] = None,
     dry_run: bool = False,
     timeout: int = 300,
+    max_tokens: int = 512,
 ) -> Dict[str, Any]:
-    """Run benchmark for a single model."""
+    """Run benchmark for a single model.
+
+    Args:
+        model_key: Key for the model (qwen or glm)
+        prompts: List of prompt dictionaries
+        categories: Optional list of categories to filter prompts
+        dry_run: If True, only show what would run without executing
+        timeout: Timeout per prompt in seconds
+        max_tokens: Maximum tokens to generate per response (default 512)
+    """
     model_info = MODELS[model_key]
     filtered_prompts = prompts
 
@@ -179,7 +202,7 @@ def run_benchmark_for_model(
     server_process = start_server(model_key, dry_run=dry_run)
 
     if dry_run:
-        print(f"Would run {len(filtered_prompts)} prompts")
+        print(f"Would run {len(filtered_prompts)} prompts (max_tokens={max_tokens})")
         return {
             "model": model_key,
             "model_name": model_info["display_name"],
@@ -208,7 +231,9 @@ def run_benchmark_for_model(
             flush=True,
         )
 
-        metrics = measure_prompt(client, model_key, prompt_text, timeout=timeout)
+        metrics = measure_prompt(
+            client, model_key, prompt_text, timeout=timeout, max_tokens=max_tokens
+        )
         print(f"✓ {metrics['total_time']:.2f}s ({metrics['token_count']} tokens)")
 
         results.append(
@@ -400,11 +425,19 @@ def main():
         choices=["qwen", "glm"],
         help="Skip benchmarking a specific model",
     )
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=512,
+        help="Maximum tokens per response for fair comparison (default: 512)",
+    )
 
     args = parser.parse_args()
 
     prompts = load_prompts()
-    print(f"Loaded {len(prompts)} test prompts")
+    print(f"Loaded {len(prompts)} test prompts\n")
+    if args.max_tokens != 512:
+        print(f"⚠️  max_tokens set to {args.max_tokens} (default: 512)\n")
 
     all_results = []
 
@@ -419,6 +452,7 @@ def main():
             categories=args.categories,
             dry_run=args.dry_run,
             timeout=args.timeout,
+            max_tokens=args.max_tokens,
         )
 
         print("\n" + format_results_table(model_results["results"]))
@@ -444,6 +478,7 @@ def main():
                     "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                     "models": all_results,
                     "categories": args.categories or ["all"],
+                    "max_tokens": args.max_tokens,
                 },
                 f,
                 indent=2,
