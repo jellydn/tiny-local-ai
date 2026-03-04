@@ -44,17 +44,31 @@ mkdir -p ~/models/qwen
 # Move your downloaded .gguf file to ~/models/qwen/
 ```
 
-#### Download from HuggingFace (Alternative)
-
-You can also download models directly using the download script:
+#### Download from HuggingFace (Recommended)
 
 ```bash
-# Download with default quantization (Q4_K_M)
-./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF
+# Get hardware recommendations
+./scripts/download-model.sh --suggest
+
+# List available models and quantizations
+./scripts/download-model.sh --list unsloth/Qwen3-Coder-Next-GGUF
 
 # Download specific quantization
-./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL
+./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:Q4_K_M
 ```
+
+**Recommended Models by Hardware:**
+
+| Hardware          | Model Size | Quant  | Context | Speed         |
+| ----------------- | ---------- | ------ | ------- | ------------- |
+| M1/M2/M3 Max 32GB | 14B-32B    | Q4_K_M | 8K-16K  | 8-15 tok/sec  |
+| M1/M2 Pro 16GB    | 7B-14B     | Q4_K_M | 8K      | 12-20 tok/sec |
+| M1/M2 8GB         | 7B         | Q4_K_S | 8K      | 15-25 tok/sec |
+
+**Avoid on 32GB:**
+
+- 70B+ models (need 46GB+)
+- Large quantizations (Q8_0, BF16) with 80B models
 
 #### Custom Cache Location
 
@@ -62,7 +76,7 @@ Set `HF_HOME` to change where models are cached (default: `~/Library/Caches/llam
 
 ```bash
 export HF_HOME=/your/custom/path
-./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL
+./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:Q4_K_M
 ```
 
 ### 3. Start Server (MacBook A)

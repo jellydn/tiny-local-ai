@@ -72,15 +72,12 @@ resolve_hf_model() {
 		quant="Q4_K_M"
 	fi
 
-	local model_path="${cache_dir}/${repo//\//_}_${quant}.gguf"
-	if [ -f "$model_path" ]; then
-		echo "$model_path"
-		return
-	fi
+	local repo_slug="${repo//\//_}"
 
-	model_path="${cache_dir}/${repo//\//_}.gguf"
-	if [ -f "$model_path" ]; then
-		echo "$model_path"
+	local found
+	found=$(ls "$cache_dir" 2>/dev/null | grep "^${repo_slug}_.*${quant}\.gguf$" | head -1)
+	if [ -n "$found" ]; then
+		echo "$cache_dir/$found"
 		return
 	fi
 
@@ -142,8 +139,46 @@ else
 	fi
 fi
 
+check_model_size() {
+	local model_path="$1"
+
+	if [ ! -f "$model_path" ]; then
+		return 0
+	fi
+
+	local model_size_mb
+	model_size_mb=$(stat -f%z "$model_path" 2>/dev/null || stat -c%s "$model_path" 2>/dev/null)
+	model_size_mb=$((model_size_mb / 1024 / 1024))
+
+	local ram_gb=$(detect_ram)
+	local usable_mb=$((ram_gb * 1024 * 70 / 100))
+
+	if [ "$model_size_mb" -gt "$usable_mb" ]; then
+		echo ""
+		echo "⚠️  WARNING: Model size exceeds ~70% of system RAM"
+		echo ""
+		echo "Model:     ${model_size_mb} MB"
+		echo "Safe max:  ~${usable_mb} MB"
+		echo ""
+		echo "This model may cause OOM errors. Recommended alternatives:"
+		echo "  - Use smaller quantization: Q4_K_S instead of Q4_K_M"
+		echo "  - Use smaller model: 14B-32B instead of 70B+"
+		echo "  - Reduce context: --ctx-size 4096"
+		echo ""
+		echo "Get recommendations: ./download-model.sh --suggest"
+		echo ""
+		read -p "Continue anyway? (y/N) " -n 1 -r
+		echo
+		if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+			exit 1
+		fi
+	fi
+}
+
 echo "Model path: $MODEL_PATH"
 echo "Cache dir: $CACHE_DIR"
+
+check_model_size "$MODEL_PATH"
 
 LLAMA_BIN=$(check_llama_server)
 if [ -z "$LLAMA_BIN" ]; then
