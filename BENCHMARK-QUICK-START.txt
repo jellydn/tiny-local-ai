@@ -1,0 +1,163 @@
+╔════════════════════════════════════════════════════════════════════╗
+║                    BENCHMARK QUICK START GUIDE                     ║
+║        Model Comparison: Qwen3-Coder-Next vs GLM-4.7-Flash         ║
+╚════════════════════════════════════════════════════════════════════╝
+
+BASIC COMMANDS
+══════════════════════════════════════════════════════════════════════
+
+# Run complete benchmark (all 15 prompts, both models)
+python3 scripts/benchmark.py
+
+# Just preview what will run (no servers started)
+python3 scripts/benchmark.py --dry-run
+
+# Test only coding prompts
+python3 scripts/benchmark.py --categories coding
+
+# Test only GLM-4.7-Flash (skip Qwen3)
+python3 scripts/benchmark.py --skip-model qwen
+
+# Save results to a specific file
+python3 scripts/benchmark.py --output my-results.json
+
+
+WHAT IT DOES
+══════════════════════════════════════════════════════════════════════
+
+1. Starts Qwen3-Coder-Next server (port 8000)
+2. Runs 15 test prompts against Qwen3
+3. Stops Qwen3 server
+4. Starts GLM-4.7-Flash server (port 8001)
+5. Runs same 15 prompts against GLM-4.7-Flash
+6. Stops GLM server
+7. Generates comparison report
+8. Saves results to JSON
+
+
+UNDERSTANDING THE RESULTS
+══════════════════════════════════════════════════════════════════════
+
+Time(s):     How long the prompt took to respond
+Tokens:      Number of tokens in the response
+Tokens/s:    How many tokens per second (throughput)
+Status:      "success" or "error"
+
+Higher tokens/s = Faster model ✓
+Lower response time = Better for real-time tasks ✓
+
+
+EXPECTED TIMES
+══════════════════════════════════════════════════════════════════════
+
+Full benchmark (15 prompts × 2 models):
+  • ~10-15 minutes total
+
+Coding category only (5 prompts × 2 models):
+  • ~3-5 minutes total
+
+Single model (5 prompts):
+  • ~1-2 minutes
+
+Note: Initial model load is slower. Subsequent prompts are faster.
+
+
+TROUBLESHOOTING
+══════════════════════════════════════════════════════════════════════
+
+Problem:  "Model not found" error
+Solution: Ensure models are in ~/Library/Caches/llama.cpp/
+
+Problem:  Server doesn't start
+Solution: Check that /opt/homebrew/bin/llama-server exists
+
+Problem:  Out of memory
+Solution: Use --skip-model to test one model at a time
+
+Problem:  Very slow / hangs
+Solution: Reduce timeout: --timeout 60
+
+
+FILES
+══════════════════════════════════════════════════════════════════════
+
+scripts/benchmark.py           Main benchmark tool
+scripts/benchmark-prompts.json Test questions (15 total)
+BENCHMARK.md                   Full documentation
+BENCHMARK-QUICK-START.txt      This file
+benchmark-results.json         Results (created after run)
+
+
+VIEW RESULTS
+══════════════════════════════════════════════════════════════════════
+
+# Pretty-print JSON results
+python3 -m json.tool benchmark-results.json
+
+# Extract just the summaries
+python3 -c "
+import json
+with open('benchmark-results.json') as f:
+    data = json.load(f)
+    for model in data['models']:
+        print(f\"\n{model['model_name']}\")
+        print(f\"  Avg time: {model['summary']['avg_time']:.2f}s\")
+        print(f\"  Tokens/s: {model['summary']['avg_tokens_per_sec']:.2f}\")
+"
+
+
+ADVANCED EXAMPLES
+══════════════════════════════════════════════════════════════════════
+
+# Run only reasoning tasks with custom timeout
+python3 scripts/benchmark.py --categories reasoning --timeout 120
+
+# Coding and Q&A (skip reasoning), save to timestamped file
+python3 scripts/benchmark.py \
+  --categories coding qa \
+  --output results-$(date +%Y%m%d_%H%M%S).json
+
+# Test just Qwen3 with 5-minute timeout per prompt
+python3 scripts/benchmark.py --skip-model glm --timeout 300
+
+# Complete benchmark with custom output
+python3 scripts/benchmark.py \
+  --output benchmark-complete.json \
+  --timeout 300
+
+
+CUSTOMIZING TEST PROMPTS
+══════════════════════════════════════════════════════════════════════
+
+Edit scripts/benchmark-prompts.json to:
+  • Add new test questions
+  • Change existing prompts
+  • Add custom categories
+
+Format:
+{
+  "id": "custom_001",
+  "category": "coding",        # coding, qa, or reasoning
+  "difficulty": "medium",      # easy, medium, hard
+  "prompt": "Your question",
+  "expected_tokens": 100
+}
+
+
+NEED HELP?
+══════════════════════════════════════════════════════════════════════
+
+See full documentation:
+  cat BENCHMARK.md
+
+View script comments:
+  less scripts/benchmark.py
+
+Check test prompts:
+  python3 -m json.tool scripts/benchmark-prompts.json
+
+════════════════════════════════════════════════════════════════════════
+
+Ready to go! Start with:  python3 scripts/benchmark.py
+
+════════════════════════════════════════════════════════════════════════
