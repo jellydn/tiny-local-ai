@@ -32,43 +32,60 @@ make LLAMA_METAL=1
 
 ### 2. Download a Model
 
-Get GGUF models from Unsloth.ai:
-
-- [Qwen3-Coder-Next-80B](https://unsloth.ai/docs/models/qwen3-coder-next) - Best for code generation
-- [MiniMax-M2.5](https://unsloth.ai/docs/models/minimax-m25) - Excellent reasoning
-
-Save to `~/models/` directory:
+Get GGUF models from HuggingFace (Recommended):
 
 ```bash
-mkdir -p ~/models/qwen
-# Move your downloaded .gguf file to ~/models/qwen/
-```
-
-#### Download from HuggingFace (Recommended)
-
-```bash
-# Get hardware recommendations
+# Get hardware-specific recommendations
 ./scripts/download-model.sh --suggest
 
-# List available models and quantizations
+# List all available quantizations for a model
 ./scripts/download-model.sh --list unsloth/Qwen3-Coder-Next-GGUF
 
-# Download specific quantization
+# Download a specific quantization
 ./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:Q4_K_M
+
+# Download with extreme quantization (80B model on 32GB)
+./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
 ```
+
+**Models available from Unsloth.ai:**
+
+- [Qwen3-Coder-Next-80B](https://huggingface.co/unsloth/Qwen3-Coder-Next-GGUF) - Best for code generation
+- [Qwen2.5-Coder-32B](https://huggingface.co/unsloth/Qwen2.5-Coder-32B-GGUF) - Excellent coding + reasoning
+- [MiniMax-M2.5](https://huggingface.co/unsloth/MiniMax-M2.5-GGUF) - Best reasoning, compact
 
 **Recommended Models by Hardware:**
 
-| Hardware          | Model Size | Quant  | Context | Speed         |
-| ----------------- | ---------- | ------ | ------- | ------------- |
-| M1/M2/M3 Max 32GB | 14B-32B    | Q4_K_M | 8K-16K  | 8-15 tok/sec  |
-| M1/M2 Pro 16GB    | 7B-14B     | Q4_K_M | 8K      | 12-20 tok/sec |
-| M1/M2 8GB         | 7B         | Q4_K_S | 8K      | 15-25 tok/sec |
+| Hardware          | Tier           | Model Size | Quant          | Context | Speed        |
+| ----------------- | -------------- | ---------- | -------------- | ------- | ------------ |
+| M1/M2/M3 Max 32GB | Best Quality   | 32B        | Q4_K_M         | 8K-16K  | 8-12 tok/sec |
+| M1/M2/M3 Max 32GB | Extended CTX   | 14B        | Q4_K_M/Q5_K_M  | 16K-32K | 15-25 tok/s  |
+| M1/M2/M3 Max 32GB | Advanced (NEW) | 80B        | UD-IQ1_S/TQ1_0 | 4K-8K   | 2-4 tok/sec  |
+| M1/M2 Pro 16GB    | Best Balance   | 14B        | Q4_K_M         | 8K      | 12-20 tok/s  |
+| M1/M2 Pro 16GB    | Larger Context | 14B        | Q4_K_S         | 16K     | 10-15 tok/s  |
+| M1/M2 8GB         | Best Option    | 7B         | Q4_K_S         | 8K      | 15-25 tok/s  |
 
-**Avoid on 32GB:**
+**New Discovery: 80B Models Now Viable! 🎉**
 
-- 70B+ models (need 46GB+)
-- Large quantizations (Q8_0, BF16) with 80B models
+With extreme quantizations (1-2 bit), even large 80B models fit on 32GB:
+
+- **UD-IQ1_S** (~21.5GB): 1-bit quantization, good quality at extreme compression
+- **UD-TQ1_0** (~18.9GB): 1-bit, slightly smaller than IQ1_S
+- **UD-IQ1_M** (~24.2GB): 2-bit, tight fit but higher quality
+
+Example (Qwen3-Coder-Next-80B on M1 Max):
+
+```bash
+./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
+./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
+```
+
+**What to Avoid:**
+
+- ❌ Q4_K_M with 80B models on 32GB (~48GB required)
+- ❌ 70B-80B models with Q5_K_M or larger quantizations
+- ✅ Use 32B-14B models for best quality/speed trade-off
+- ✅ Use extreme quantizations (UD-IQ1_S) only if you need large model reasoning and can tolerate 2-4 tok/sec
 
 #### Custom Cache Location
 
