@@ -1,0 +1,109 @@
+{
+  "prompts": [
+    {
+      "id": "coding_001",
+      "category": "coding",
+      "difficulty": "easy",
+      "prompt": "Write a Python function to calculate the Fibonacci sequence up to n numbers. Include docstring.",
+      "expected_tokens": 80
+    },
+    {
+      "id": "coding_002",
+      "category": "coding",
+      "difficulty": "easy",
+      "prompt": "Write a function in Python to check if a number is prime.",
+      "expected_tokens": 60
+    },
+    {
+      "id": "coding_003",
+      "category": "coding",
+      "difficulty": "medium",
+      "prompt": "Find the bug in this Python code: def factorial(n): if n == 0: return 1; return n * factorial(n). What's wrong and how do you fix it?",
+      "expected_tokens": 100
+    },
+    {
+      "id": "coding_004",
+      "category": "coding",
+      "difficulty": "medium",
+      "prompt": "Write a Python function that reverses a string without using slicing. What are alternative approaches?",
+      "expected_tokens": 120
+    },
+    {
+      "id": "coding_005",
+      "category": "coding",
+      "difficulty": "hard",
+      "prompt": "Implement a binary search algorithm in Python. Include time and space complexity analysis.",
+      "expected_tokens": 150
+    },
+    {
+      "id": "qa_001",
+      "category": "qa",
+      "difficulty": "easy",
+      "prompt": "What is the capital of France?",
+      "expected_tokens": 20
+    },
+    {
+      "id": "qa_002",
+      "category": "qa",
+      "difficulty": "easy",
+      "prompt": "Explain what photosynthesis is in simple terms.",
+      "expected_tokens": 80
+    },
+    {
+      "id": "qa_003",
+      "category": "qa",
+      "difficulty": "medium",
+      "prompt": "What are the main differences between SQL and NoSQL databases? Provide examples.",
+      "expected_tokens": 150
+    },
+    {
+      "id": "qa_004",
+      "category": "qa",
+      "difficulty": "medium",
+      "prompt": "How does machine learning differ from traditional programming?",
+      "expected_tokens": 100
+    },
+    {
+      "id": "qa_005",
+      "category": "qa",
+      "difficulty": "hard",
+      "prompt": "Describe the blockchain technology and explain how it ensures security in cryptocurrencies.",
+      "expected_tokens": 180
+    },
+    {
+      "id": "reasoning_001",
+      "category": "reasoning",
+      "difficulty": "easy",
+      "prompt": "If John is taller than Mary, and Mary is taller than Sam, who is the tallest?",
+      "expected_tokens": 40
+    },
+    {
+      "id": "reasoning_002",
+      "category": "reasoning",
+      "difficulty": "medium",
+      "prompt": "A farmer has 15 chickens and 10 goats. If each chicken has 2 legs and each goat has 4 legs, how many total legs are there?",
+      "expected_tokens": 60
+    },
+    {
+      "id": "reasoning_003",
+      "category": "reasoning",
+      "difficulty": "medium",
+      "prompt": "If it takes 5 workers 10 days to build a fence, how long will it take 10 workers to build the same fence? Explain your reasoning.",
+      "expected_tokens": 100
+    },
+    {
+      "id": "reasoning_004",
+      "category": "reasoning",
+      "difficulty": "hard",
+      "prompt": "A store sells apples at $1.50 each and oranges at $2 each. If you have $10 and want to maximize the number of fruits, what should you buy? Show all possible combinations.",
+      "expected_tokens": 150
+    },
+    {
+      "id": "reasoning_005",
+      "category": "reasoning",
+      "difficulty": "hard",
+      "prompt": "In a town of 100 people, 60 like coffee and 50 like tea. If 30 people like both, how many people like neither? Draw a Venn diagram explanation.",
+      "expected_tokens": 140
+    }
+  ]
+}
