@@ -197,28 +197,54 @@ fi
 
 echo "Starting server in tmux..."
 
-# Always use local model path if found, regardless of HF_MODE
-# HF_MODE just means the model reference contains '/' (HuggingFace repo format)
-tmux new-session -d -s "$TMUX_SESSION" \
-	"$LLAMA_BIN" \
-	-m "$MODEL_PATH" \
-	--host "$HOST" \
-	--port "$PORT" \
-	--ctx-size "$CTX_SIZE" \
-	--n-gpu-layers 999 \
-	--log-disable
+# Build the server command as a single string
+SERVER_CMD="$LLAMA_BIN -m \"$MODEL_PATH\" --host $HOST --port $PORT --ctx-size $CTX_SIZE --n-gpu-layers 999 --log-disable"
 
-sleep 2
+# Try to start in tmux
+if command -v tmux &>/dev/null; then
+	# Use shell -c to ensure proper argument parsing in tmux
+	tmux new-session -d -s "$TMUX_SESSION" "sh" "-c" "$SERVER_CMD" 2>/dev/null
+	sleep 2
 
-if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+	if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+		echo ""
+		echo "=== Server Started (in tmux) ==="
+		echo "URL: http://$HOST:$PORT/v1"
+		echo "API: OpenAI-compatible"
+		echo ""
+		echo "View logs: tmux attach -t $TMUX_SESSION"
+		echo "Stop: ./stop-llm.sh"
+		exit 0
+	fi
+fi
+
+# Fallback: Start server in background directly
+echo ""
+echo "=== Starting server in background (no tmux) ==="
+echo "URL: http://$HOST:$PORT/v1"
+echo "API: OpenAI-compatible"
+echo ""
+echo "Logs will appear below. Press Ctrl+C to stop (server continues running)"
+echo ""
+
+# Start server in background, redirect output to a log file
+LOG_FILE="/tmp/llm-server-$PORT.log"
+eval "$SERVER_CMD" >"$LOG_FILE" 2>&1 &
+SERVER_PID=$!
+
+# Give server time to initialize
+sleep 3
+
+# Check if server is still running
+if kill -0 $SERVER_PID 2>/dev/null; then
+	echo "Server PID: $SERVER_PID"
+	echo "Logs: $LOG_FILE"
 	echo ""
-	echo "=== Server Started ==="
-	echo "URL: http://$HOST:$PORT/v1"
-	echo "API: OpenAI-compatible"
-	echo ""
-	echo "View logs: tmux attach -t $TMUX_SESSION"
-	echo "Stop: ./stop-llm.sh"
+	echo "To stop: kill $SERVER_PID"
+	exit 0
 else
-	echo "Error: Failed to start server"
+	echo "Error: Server failed to start"
+	echo "Logs:"
+	cat "$LOG_FILE" 2>/dev/null || echo "(no logs)"
 	exit 1
 fi
