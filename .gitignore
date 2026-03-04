@@ -1,0 +1,14 @@
+# Models (GGUF files - large, downloaded separately)
+models/
+*.gguf
+
+# Config
+.config/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
