@@ -38,25 +38,36 @@ suggest_quant() {
 	if [ "$mem_mb" -ge 32000 ]; then
 		echo "=== Recommended: M1/M2/M3 Max 32GB ==="
 		echo ""
-		echo "Best Balance (Coding):"
-		echo "  Model: 14B-32B class (e.g., Qwen2.5-Coder-32B, DeepSeek-Coder-V2)"
+		echo "Tier 1 - Best for Coding (Strongest Quality):"
+		echo "  Model: 32B class"
 		echo "  Quant: Q4_K_M"
+		echo "  Example: Qwen2.5-Coder-32B:Q4_K_M"
 		echo "  Context: 8K-16K"
-		echo "  Speed: 8-15 tok/sec"
+		echo "  Speed: 8-12 tok/sec"
 		echo ""
-		echo "Larger Context (16K+):"
+		echo "Tier 2 - Extended Context:"
 		echo "  Model: 14B class"
 		echo "  Quant: Q4_K_M or Q5_K_M"
+		echo "  Example: Qwen2.5-Coder-14B:Q4_K_M"
 		echo "  Context: 16K-32K"
+		echo "  Speed: 15-25 tok/sec"
 		echo ""
-		echo "Example: $0 <repo>:Q4_K_M"
+		echo "Tier 3 - Very Large Models with Extreme Compression:"
+		echo "  Model: 80B class (Qwen3-Coder-Next-80B)"
+		echo "  Quant: UD-IQ1_S (1-bit, ~21.5GB) or UD-TQ1_0 (~18.9GB)"
+		echo "  Context: 8K"
+		echo "  Speed: 2-4 tok/sec (slow but works)"
+		echo "  Note: Use if you need bleeding-edge large model reasoning"
 		echo ""
-		echo "Avoid: 70B+ models (won't fit in GPU working set)"
+		echo "Examples:"
+		echo "  $0 unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S"
+		echo "  $0 unsloth/Qwen3-Coder-Next-GGUF:UD-TQ1_0"
+		echo "  $0 unsloth/Qwen2.5-Coder-32B-GGUF:Q4_K_M"
 	elif [ "$mem_mb" -ge 24000 ]; then
 		echo "=== Recommended: M3/M2 Pro, M2 Max 24GB ==="
 		echo ""
 		echo "Best Balance:"
-		echo "  Model: 14B class"
+		echo "  Model: 14B-32B class"
 		echo "  Quant: Q4_K_M"
 		echo "  Context: 8K-16K"
 		echo ""
@@ -64,7 +75,12 @@ suggest_quant() {
 		echo "  Quant: Q4_K_S"
 		echo "  Context: 16K-32K"
 		echo ""
-		echo "Example: $0 <repo>:Q4_K_M"
+		echo "Large Model (Extreme):"
+		echo "  Model: 80B (UD-IQ1_S only, very tight fit)"
+		echo "  Quant: UD-IQ1_S (~21.5GB)"
+		echo "  Context: 4K-8K"
+		echo ""
+		echo "Example: $0 unsloth/Qwen2.5-Coder-32B-GGUF:Q4_K_M"
 	elif [ "$mem_mb" -ge 16000 ]; then
 		echo "=== Recommended: M2/M1 Pro, M1 Max 16GB ==="
 		echo ""
@@ -77,7 +93,7 @@ suggest_quant() {
 		echo "  Quant: Q4_K_S"
 		echo "  Context: 16K"
 		echo ""
-		echo "Example: $0 <repo>:Q4_K_M"
+		echo "Example: $0 unsloth/Qwen2.5-Coder-14B-GGUF:Q4_K_M"
 	elif [ "$mem_mb" -ge 10000 ]; then
 		echo "=== Recommended: M3/M2/M1 (unified memory) ==="
 		echo ""
@@ -86,7 +102,7 @@ suggest_quant() {
 		echo "  Quant: Q4_K_S or Q4_K_M"
 		echo "  Context: 8K"
 		echo ""
-		echo "Example: $0 <repo>:Q4_K_S"
+		echo "Example: $0 unsloth/Qwen2.5-Coder-7B-GGUF:Q4_K_S"
 	else
 		echo "=== Low Memory System ==="
 		echo ""
@@ -95,14 +111,21 @@ suggest_quant() {
 		echo "  Quant: Q3_K_M or Q2_K"
 		echo "  Context: 4K-8K"
 		echo ""
-		echo "Example: $0 <repo>:Q3_K_S"
+		echo "Example: $0 unsloth/Qwen2.5-Coder-7B-GGUF:Q3_K_S"
 	fi
 
+	echo ""
+	echo "=== Real Model Sizes (Qwen3-Coder-Next-80B) ==="
+	echo "  UD-IQ1_S (1-bit):    ~21.5 GB ✓ Fits 32GB"
+	echo "  UD-TQ1_0 (1-bit):    ~18.9 GB ✓ Fits 32GB"
+	echo "  UD-IQ1_M (2-bit):    ~24.2 GB ✓ Fits 32GB"
+	echo "  Q4_K_M:              ~48.5 GB ✗ Too large"
 	echo ""
 	echo "Context vs Memory Rule:"
 	echo "  7B  model -> 32K+ context OK"
 	echo "  14B model -> 16K context OK"
 	echo "  32B model -> 8K context OK"
+	echo "  80B model -> 4K-8K context only (memory tight)"
 	echo ""
 	echo "Tip: Use --list to see available quantizations for your repo."
 }
@@ -180,62 +203,76 @@ download_model() {
 
 	mkdir -p "$cache_dir"
 
-	local url="https://huggingface.co/$repo/resolve/main/$quant/${repo_slug}-${quant}.gguf"
+	# Extract model base name (remove -GGUF suffix if present)
+	local repo_name="${repo##*/}"
+	local model_base="${repo_name%-GGUF}"
 
-	echo "Trying: $url"
-	echo ""
+	# Try different URL patterns in order of likelihood
+	local urls=()
 
-	if [ -n "$token" ]; then
-		curl -L -H "Authorization: Bearer $token" -o "$output_path" "$url" --progress-bar 2>&1
-	else
-		curl -L -o "$output_path" "$url" --progress-bar 2>&1
-	fi
+	# Pattern 1: Root level with model base name (e.g., Qwen3-Coder-Next-UD-IQ1_S.gguf)
+	urls+=("https://huggingface.co/$repo/resolve/main/${model_base}-${quant}.gguf")
 
-	if [ $? -ne 0 ] || [ ! -f "$output_path" ] || [ ! -s "$output_path" ]; then
+	# Pattern 2: In quantization subfolder with model base (e.g., Q4_K_M/Qwen3-Coder-Next-Q4_K_M.gguf)
+	urls+=("https://huggingface.co/$repo/resolve/main/${quant}/${model_base}-${quant}.gguf")
+
+	# Pattern 3: In quantization subfolder with part number (e.g., Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00001-of-00003.gguf)
+	urls+=("https://huggingface.co/$repo/resolve/main/${quant}/${model_base}-${quant}-00001-of-00003.gguf")
+
+	local success=false
+	for url in "${urls[@]}"; do
+		# Skip if file already exists and is valid
+		if [ -f "$output_path" ] && [ -s "$output_path" ]; then
+			# Check if it's a valid GGUF file (starts with magic bytes GGUF)
+			local magic
+			magic=$(head -c 4 "$output_path" 2>/dev/null)
+			if [ "$magic" = "GGUF" ]; then
+				echo ""
+				echo "✓ Model already cached"
+				success=true
+				break
+			fi
+		fi
+
+		# Remove incomplete/invalid file before trying next URL
 		rm -f "$output_path"
-		echo ""
-		echo "Trying alternative path (subfolder)..."
 
-		local alt_url="https://huggingface.co/$repo/resolve/main/$quant/${repo_slug}-${quant}-00001-of-00003.gguf"
-		echo "Trying: $alt_url"
-		echo ""
+		echo "Trying: $url"
 
 		if [ -n "$token" ]; then
-			curl -L -H "Authorization: Bearer $token" -o "$output_path" "$alt_url" --progress-bar 2>&1
+			curl -L -H "Authorization: Bearer $token" -o "$output_path" "$url" --progress-bar 2>&1
 		else
-			curl -L -o "$output_path" "$alt_url" --progress-bar 2>&1
+			curl -L -o "$output_path" "$url" --progress-bar 2>&1
 		fi
-	fi
 
-	if [ -f "$output_path" ] && [ -s "$output_path" ]; then
-		echo ""
-		echo "Downloaded to: $output_path"
-	else
-		curl -L -o "$output_path" "$url" --progress-bar 2>&1
-	fi
-
-	if [ $? -ne 0 ] || [ ! -f "$output_path" ] || [ ! -s "$output_path" ]; then
-		echo ""
-		echo "Trying alternative path (root)..."
-
-		local alt_url="https://huggingface.co/$repo/resolve/main/$model_file"
-		echo "Trying: $alt_url"
 		echo ""
 
-		if [ -n "$token" ]; then
-			curl -L -H "Authorization: Bearer $token" -o "$output_path" "$alt_url" --progress-bar 2>&1
+		# Validate downloaded file
+		if [ -f "$output_path" ] && [ -s "$output_path" ]; then
+			local magic
+			magic=$(head -c 4 "$output_path" 2>/dev/null)
+			if [ "$magic" = "GGUF" ]; then
+				echo "✓ Downloaded to: $output_path"
+				success=true
+				break
+			else
+				# File was downloaded but is invalid (probably error page)
+				rm -f "$output_path"
+				echo "✗ Invalid file (not GGUF format). Trying next URL..."
+				echo ""
+			fi
 		else
-			curl -L -o "$output_path" "$alt_url" --progress-bar 2>&1
+			echo "✗ Download failed. Trying next URL..."
+			echo ""
 		fi
-	fi
+	done
 
-	if [ -f "$output_path" ] && [ -s "$output_path" ]; then
+	if [ "$success" = false ]; then
+		echo "Error: Download failed for all URL patterns."
+		echo "The model file may not exist or the repository structure is different."
 		echo ""
-		echo "Downloaded to: $output_path"
-	else
-		echo ""
-		echo "Error: Download failed. The model file may not exist."
 		echo "Try listing available models: ./download-model.sh --list $repo"
+		exit 1
 	fi
 }
 

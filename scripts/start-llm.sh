@@ -197,25 +197,16 @@ fi
 
 echo "Starting server in tmux..."
 
-if [ "$HF_MODE" = true ]; then
-	tmux new-session -d -s "$TMUX_SESSION" \
-		"$LLAMA_BIN" \
-		-hf "$MODEL_NAME" \
-		--host "$HOST" \
-		--port "$PORT" \
-		--ctx-size "$CTX_SIZE" \
-		--n-gpu-layers 999 \
-		--log-disable
-else
-	tmux new-session -d -s "$TMUX_SESSION" \
-		"$LLAMA_BIN" \
-		-m "$MODEL_PATH" \
-		--host "$HOST" \
-		--port "$PORT" \
-		--ctx-size "$CTX_SIZE" \
-		--n-gpu-layers 999 \
-		--log-disable
-fi
+# Always use local model path if found, regardless of HF_MODE
+# HF_MODE just means the model reference contains '/' (HuggingFace repo format)
+tmux new-session -d -s "$TMUX_SESSION" \
+	"$LLAMA_BIN" \
+	-m "$MODEL_PATH" \
+	--host "$HOST" \
+	--port "$PORT" \
+	--ctx-size "$CTX_SIZE" \
+	--n-gpu-layers 999 \
+	--log-disable
 
 sleep 2
 
