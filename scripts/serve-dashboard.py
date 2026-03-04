@@ -19,39 +19,39 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <meta http-equiv="refresh" content="5">
     <title>Tiny Local AI Dashboard</title>
     <style>
-        body {
+        body {{
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             max-width: 800px;
             margin: 50px auto;
             padding: 20px;
             background: #1a1a2e;
             color: #eee;
-        }
-        h1 { color: #00d9ff; margin-bottom: 30px; }
-        .card {
+        }}
+        h1 {{ color: #00d9ff; margin-bottom: 30px; }}
+        .card {{
             background: #16213e;
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 20px;
             border: 1px solid #0f3460;
-        }
-        .status { display: flex; align-items: center; gap: 10px; }
-        .status-dot {
+        }}
+        .status {{ display: flex; align-items: center; gap: 10px; }}
+        .status-dot {{
             width: 12px; height: 12px; border-radius: 50%;
-        }
-        .online { background: #00ff88; box-shadow: 0 0 10px #00ff88; }
-        .offline { background: #ff4444; }
-        .metric {
+        }}
+        .online {{ background: #00ff88; box-shadow: 0 0 10px #00ff88; }}
+        .offline {{ background: #ff4444; }}
+        .metric {{
             display: flex;
             justify-content: space-between;
             padding: 10px 0;
             border-bottom: 1px solid #0f3460;
-        }
-        .metric:last-child { border-bottom: none; }
-        .label { color: #888; }
-        .value { color: #00d9ff; font-weight: bold; }
-        .error { color: #ff4444; padding: 20px; text-align: center; }
-        .info { font-size: 12px; color: #666; margin-top: 20px; }
+        }}
+        .metric:last-child {{ border-bottom: none; }}
+        .label {{ color: #888; }}
+        .value {{ color: #00d9ff; font-weight: bold; }}
+        .error {{ color: #ff4444; padding: 20px; text-align: center; }}
+        .info {{ font-size: 12px; color: #666; margin-top: 20px; }}
     </style>
 </head>
 <body>
