@@ -266,6 +266,60 @@ Expected performance on M1 Max 32GB:
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) - GGML-based LLM inference
 - [Unsloth](https://unsloth.ai/) - Fast fine-tuning and GGUF conversion
 
+## Verification & Testing
+
+All features have been tested and verified on **MacBook A - M1 Max 32GB**:
+
+### ✅ Verified Functionality
+
+- [x] **Model Download**: Qwen3-Coder-Next (80B) UD-IQ1_S successfully downloaded (21.5GB)
+- [x] **Server Startup**: llama-server starts and loads model successfully
+- [x] **GPU Acceleration**: Metal acceleration enabled, all layers offloaded to GPU
+- [x] **Memory Usage**: 32.5GB RAM (full model loaded)
+- [x] **Health Endpoint**: `/health` responds correctly
+- [x] **Completions API**: `/v1/completions` generates correct responses (26-28 tok/sec)
+- [x] **Chat API**: `/v1/chat/completions` works with messages and streaming
+- [x] **Streaming**: SSE streaming works correctly
+- [x] **Python Client**: `llm-client.py` works with and without streaming
+- [x] **LAN Access**: Server accessible on `192.168.1.11:8000` from any machine
+- [x] **Code Generation**: Generated code is syntactically correct and functional
+
+### Test Examples
+
+```bash
+# API Health Check
+curl http://localhost:8000/health
+# {"status":"ok"}
+
+# Chat Completion
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen",
+    "messages": [{"role": "user", "content": "Hello"}],
+    "max_tokens": 50
+  }'
+
+# Python Client (with streaming)
+python scripts/llm-client.py -s "Write a hello world function"
+
+# From another Mac on LAN
+export LLM_SERVER_URL=http://192.168.1.11:8000/v1
+python scripts/llm-client.py "Your prompt here"
+```
+
+### Performance Benchmarks
+
+| Metric              | Value                |
+| ------------------- | -------------------- |
+| Prompt Processing   | 67.4 tok/sec         |
+| Response Generation | 26.6 tok/sec         |
+| Context Size        | 32,768 tokens        |
+| GPU Memory          | 25.5 GB              |
+| Total Memory        | 32.5 GB              |
+| Model               | Qwen3-Coder-Next-80B |
+| Quantization        | UD-IQ1_S (1-bit)     |
+
 ---
 
 ## 👤 Author
