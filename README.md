@@ -136,13 +136,125 @@ python scripts/llm-client.py -s "Tell me a story"
 
 ## Scripts
 
-| Script               | Description                                   |
-| -------------------- | --------------------------------------------- |
-| `download-model.sh`  | Download GGUF models from HuggingFace         |
-| `start-llm.sh`       | Start LLM server with auto hardware detection |
-| `stop-llm.sh`        | Stop the LLM server                           |
-| `llm-client.py`      | CLI client for interacting with the server    |
-| `serve-dashboard.py` | Web dashboard to monitor server status        |
+| Script                   | Description                                   |
+| ------------------------ | --------------------------------------------- |
+| `download-model.sh`      | Download GGUF models from HuggingFace         |
+| `start-llm.sh`           | Start LLM server with auto hardware detection |
+| `start-llm-optimized.sh` | Start with optimized parameters by model      |
+| `stop-llm.sh`            | Stop the LLM server                           |
+| `llm-client.py`          | CLI client for interacting with the server    |
+| `serve-dashboard.py`     | Web dashboard to monitor server status        |
+| `doctor.py`              | Hardware detection & model recommendations    |
+| `router.py`              | Smart routing CLI with task-type detection    |
+
+## Hardware Doctor
+
+Auto-detect hardware and get model recommendations:
+
+```bash
+python3 scripts/doctor.py
+```
+
+Output:
+
+```
+============================================================
+  🔍 Tiny Local AI - Hardware Doctor
+============================================================
+
+============================================================
+  DETECTED HARDWARE
+============================================================
+  Chip:                 Apple M1 Max
+  CPU Cores:            10
+  GPU Cores:            24
+  RAM:                  32 GB
+  RAM Available:        28 GB
+  Metal Support:        ✅ Yes
+
+============================================================
+  RECOMMENDED MODELS
+============================================================
+  1. Qwen3-Coder-Next (20.0GB)
+     Estimated: ~25 tok/sec | Best for: coding
+  2. GLM-4.7-Flash (16.3GB)
+     Estimated: ~41 tok/sec | Best for: chat, QA
+
+============================================================
+  SYSTEM CHECK
+============================================================
+  ✅ llama-server installed
+  ✅ Model cache configured
+```
+
+## Smart Router
+
+Automatically route prompts to optimal model based on task type:
+
+```bash
+# Auto-detect and route
+python3 scripts/router.py "Write a Python function to fibonacci"
+
+# Force specific model
+python3 scripts/router.py "Hello" --model glm
+
+# With streaming
+python3 scripts/router.py "Tell me a story" --stream
+
+# Show routing statistics
+python3 scripts/router.py "prompt" --stats
+```
+
+### Task Detection
+
+The router automatically detects:
+
+- **Coding tasks**: Keywords like `function`, `class`, `debug`, `api`, etc.
+- **General tasks**: Everything else
+
+Routing logic:
+
+- **Coding prompts** → Qwen3-Coder-Next (concise, structured)
+- **General prompts** → GLM-4.7-Flash (fast, detailed)
+
+### Dual Server Mode
+
+For 64GB+ RAM, run both models simultaneously:
+
+```bash
+./scripts/start-dual-servers.sh
+# Starts Qwen on port 8000, GLM on port 8001
+
+# Then use router
+python3 scripts/router.py "your prompt"
+```
+
+## Model Hot-Swap
+
+Quickly switch between models on a single server:
+
+```bash
+# Check current status
+python3 scripts/swap-model.py status
+
+# Swap to Qwen
+python3 scripts/swap-model.py qwen
+
+# Swap to GLM
+python3 scripts/swap-model.py glm
+
+# Or use symlink
+./swap status
+./swap qwen
+./swap glm
+```
+
+The hot-swap automatically:
+
+1. Detects current model
+2. Stops old server gracefully
+3. Starts new model with optimized parameters
+4. Waits for server to be ready
 
 ## Configuration
 
@@ -310,15 +422,31 @@ python scripts/llm-client.py "Your prompt here"
 
 ### Performance Benchmarks
 
-| Metric              | Value                |
-| ------------------- | -------------------- |
-| Prompt Processing   | 67.4 tok/sec         |
-| Response Generation | 26.6 tok/sec         |
-| Context Size        | 32,768 tokens        |
-| GPU Memory          | 25.5 GB              |
-| Total Memory        | 32.5 GB              |
-| Model               | Qwen3-Coder-Next-80B |
-| Quantization        | UD-IQ1_S (1-bit)     |
+Normalized benchmark (max_tokens=512) on M1 Max 32GB:
+
+| Model            | Avg Response Time | Tokens/sec | Avg Tokens | Use Case     |
+| ---------------- | ----------------- | ---------- | ---------- | ------------ |
+| Qwen3-Coder-Next | 14.95s ± 6.54s    | 24.63      | 380        | Coding       |
+| GLM-4.7-Flash    | 11.39s ± 2.94s    | 41.19      | 468        | General/Chat |
+
+**Key Findings:**
+
+- GLM is **23.8% faster per-task** (11.39s vs 14.95s)
+- GLM is **67.2% faster per-token** (41.19 vs 24.63 tok/sec)
+- Qwen generates **19% more concise** responses (380 vs 468 tokens)
+
+Run your own benchmarks:
+
+```bash
+# Quick benchmark (5 prompts)
+python3 scripts/benchmark.py --categories coding --skip-model glm
+
+# Full benchmark (all prompts)
+python3 scripts/benchmark.py --max-tokens 512
+
+# Output JSON for analysis
+python3 scripts/benchmark.py --output results.json
+```
 
 ---
 
