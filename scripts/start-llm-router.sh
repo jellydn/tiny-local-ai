@@ -3,32 +3,87 @@ set -e
 set -u
 
 echo "=== Tiny Local AI - Single Server Mode ==="
-echo "Note: llama.cpp router mode not available in this version."
-echo "Use ./swap qwen or ./swap glm to switch models."
 echo
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODELS_CACHE="$HOME/Library/Caches/llama.cpp"
 
-DEFAULT_MODEL="${1:-qwen}"
+# Define available models and their metadata
+get_model_config() {
+	local model=$1
+	case "$model" in
+	qwen)
+		echo "path:$MODELS_CACHE/unsloth_Qwen3-Coder-Next-GGUF_UD-IQ1_S.gguf"
+		echo "name:Qwen3-Coder-Next (IQ1_S, 80B)"
+		echo "args:--temp 0.7 --repeat-penalty 1.0"
+		;;
+	glm)
+		echo "path:$MODELS_CACHE/unsloth_GLM-4.7-Flash-GGUF_UD-Q4_K_XL.gguf"
+		echo "name:GLM-4.7-Flash (Q4_K_XL, 30B)"
+		echo "args:--temp 0.7 --top-p 1.0 --min-p 0.01"
+		;;
+	esac
+}
 
-case "$DEFAULT_MODEL" in
-qwen)
-	MODEL_PATH="$MODELS_CACHE/unsloth_Qwen3-Coder-Next-GGUF_UD-IQ1_S.gguf"
-	MODEL_NAME="Qwen3-Coder-Next (IQ1_S, 80B)"
-	TEMP_ARGS="--temp 0.7 --repeat-penalty 1.0"
-	;;
-glm)
-	MODEL_PATH="$MODELS_CACHE/unsloth_GLM-4.7-Flash-GGUF_UD-Q4_K_XL.gguf"
-	MODEL_NAME="GLM-4.7-Flash (Q4_K_XL, 30B)"
-	TEMP_ARGS="--temp 0.7 --top-p 1.0 --min-p 0.01"
-	;;
-*)
-	echo "Error: Unknown model '$DEFAULT_MODEL'"
-	echo "Usage: $0 [qwen|glm]"
+# Get available models
+declare -a AVAILABLE_MODELS
+for model in qwen glm; do
+	path=$(get_model_config "$model" | grep "^path:" | cut -d: -f2-)
+	if [ -f "$path" ]; then
+		AVAILABLE_MODELS+=("$model")
+	fi
+done
+
+# Determine which model to use
+if [ $# -gt 0 ]; then
+	# User specified model
+	SELECTED_MODEL="$1"
+	path=$(get_model_config "$SELECTED_MODEL" | grep "^path:" | cut -d: -f2-)
+	if [ ! -f "$path" ]; then
+		echo "Error: Model '$SELECTED_MODEL' not found in cache"
+		echo "Available models: ${AVAILABLE_MODELS[*]}"
+		exit 1
+	fi
+elif [ ${#AVAILABLE_MODELS[@]} -eq 0 ]; then
+	# No models found
+	echo "Error: No models found in cache: $MODELS_CACHE"
+	echo "Download a model first:"
+	echo "  ./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S"
 	exit 1
-	;;
-esac
+elif [ ${#AVAILABLE_MODELS[@]} -eq 1 ]; then
+	# Only one model available
+	SELECTED_MODEL="${AVAILABLE_MODELS[0]}"
+	echo "Found 1 model: $SELECTED_MODEL"
+	echo
+else
+	# Multiple models available - ask user
+	echo "Multiple models found. Which would you like to start?"
+	echo
+	for i in "${!AVAILABLE_MODELS[@]}"; do
+		idx=$((i + 1))
+		model="${AVAILABLE_MODELS[$i]}"
+		config_output=$(get_model_config "$model")
+		path=$(echo "$config_output" | grep "^path:" | cut -d: -f2-)
+		name=$(echo "$config_output" | grep "^name:" | cut -d: -f2-)
+		size=$(stat -f%z "$path" 2>/dev/null | awk '{printf "%.1fGB", $1 / 1024 / 1024 / 1024}')
+		printf "  %d) %s (%s) %s\n" "$idx" "$model" "$name" "$size"
+	done
+	echo
+	read -p "Select model (1-${#AVAILABLE_MODELS[@]}): " choice
+
+	if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt ${#AVAILABLE_MODELS[@]} ]; then
+		echo "Invalid choice"
+		exit 1
+	fi
+
+	SELECTED_MODEL="${AVAILABLE_MODELS[$((choice - 1))]}"
+fi
+
+# Get config for selected model
+config_output=$(get_model_config "$SELECTED_MODEL")
+MODEL_PATH=$(echo "$config_output" | grep "^path:" | cut -d: -f2-)
+MODEL_NAME=$(echo "$config_output" | grep "^name:" | cut -d: -f2-)
+TEMP_ARGS_VALUE=$(echo "$config_output" | grep "^args:" | cut -d: -f2-)
 
 if [ ! -f "$MODEL_PATH" ]; then
 	echo "Error: Model not found at $MODEL_PATH"
@@ -58,7 +113,7 @@ llama-server \
 	--port "$PORT" \
 	--ctx-size "$CTX_SIZE" \
 	--n-gpu-layers "$GPU_LAYERS" \
-	$TEMP_ARGS &
+	$TEMP_ARGS_VALUE &
 
 echo "Waiting for server to start..."
 

@@ -331,27 +331,32 @@ The `start-llm.sh` script supports multiple ways to specify models with automati
 ### Pattern 5: Router (Auto-Start)
 
 ```bash
-# Single model with optimized defaults
+# No arguments - shows menu to choose from available models
 ./scripts/start-llm-router.sh
 
-# Detects cached models and auto-selects best fit for hardware
-# Creates single-server mode with quick startup
+# Explicit model selection
+./scripts/start-llm-router.sh qwen
+./scripts/start-llm-router.sh glm
 ```
 
-- Automatically detects available cached models
-- Selects best match for your hardware
-- Single model, optimized parameters
-- Best for: One-command startup, minimal configuration
+**Behavior:**
+
+- **No args, 2+ models**: Shows interactive menu with model sizes
+- **No args, 1 model**: Auto-selects the only available model
+- **No args, 0 models**: Error with download instructions
+- **With model name**: Starts that specific model directly
+
+Best for: One-command startup, user choice, minimal configuration
 
 ### Model Discovery Behavior
 
-| Pattern     | Search Order      | Download | Auto-Find      |
-| ----------- | ----------------- | -------- | -------------- |
-| Simple name | `~/models`, cache | ❌ No    | ✅ Yes         |
-| HF repo     | Cache, then HF    | ✅ Yes   | ✅ Yes         |
-| HF + quant  | Cache, then HF    | ✅ Yes   | ✅ Yes (exact) |
-| Full path   | Direct            | ❌ No    | ❌ No          |
-| Router      | Cache             | ❌ No    | ✅ Yes         |
+| Pattern     | Search Order      | Download | Auto-Find      | User Interaction  |
+| ----------- | ----------------- | -------- | -------------- | ----------------- |
+| Simple name | `~/models`, cache | ❌ No    | ✅ Yes         | None              |
+| HF repo     | Cache, then HF    | ✅ Yes   | ✅ Yes         | None              |
+| HF + quant  | Cache, then HF    | ✅ Yes   | ✅ Yes (exact) | None              |
+| Full path   | Direct            | ❌ No    | ❌ No          | None              |
+| Router      | Cache             | ❌ No    | ✅ Yes         | Menu if 2+ models |
 
 ### Example Workflows
 
