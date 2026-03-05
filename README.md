@@ -145,6 +145,7 @@ python scripts/llm-client.py -s "Tell me a story"
 | `start-llm-optimized.sh` | Start with optimized parameters by model      |
 | `stop-llm.sh`            | Stop the LLM server                           |
 | `list-models.sh`         | List available cached models with sizes       |
+| `benchmark-startup.sh`   | Measure model startup times across iterations |
 | `llm-client.py`          | CLI client for interacting with the server    |
 | `serve-dashboard.py`     | Web dashboard to monitor server status        |
 | `doctor.py`              | Hardware detection & model recommendations    |
@@ -402,6 +403,40 @@ python scripts/llm-client.py "Write hello world in Python"
 # Verbose output to see what's happening
 ./swap qwen --verbose
 ```
+
+## Performance Benchmarking
+
+### Startup Time Benchmarking
+
+Measure how long it takes for a model to become ready:
+
+```bash
+# Benchmark a model (3 iterations, default)
+./scripts/benchmark-startup.sh qwen3-coder-next
+
+# Custom iterations
+./scripts/benchmark-startup.sh unsloth/Qwen3-Coder-Next-GGUF 5
+
+# With custom port
+PORT=8080 ./scripts/benchmark-startup.sh glm 3
+```
+
+Output example:
+
+```
+Successful starts: 3/3
+Average startup:  14250ms
+Min startup:      13847ms
+Max startup:      14890ms
+Total time:       42s
+```
+
+This helps you understand:
+
+- **Expected startup time** for your hardware
+- **Variance** across runs (useful for reliability assessment)
+- **Model comparison** - Which quantization/model loads fastest
+- **System performance** - Baseline for ML workload optimization
 
 ## Configuration
 
