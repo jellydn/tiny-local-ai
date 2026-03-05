@@ -100,7 +100,7 @@ export HF_HOME=/your/custom/path
 
 ```bash
 # Basic usage
-./scripts/start-llm.sh qwen3-coder-next
+./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
 
 # Or with custom model path
 MODEL_NAME=my-model ./scripts/start-llm.sh
@@ -112,6 +112,7 @@ MODEL_NAME=my-model ./scripts/start-llm.sh
 # Install client dependency
 pip install openai
 
+export LLM_SERVER_URL=http://192.168.1.x:8000/v1
 # Send a prompt
 python scripts/llm-client.py "Write a Python function to calculate fibonacci"
 
