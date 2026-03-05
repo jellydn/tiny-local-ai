@@ -141,12 +141,16 @@ python scripts/llm-client.py -s "Tell me a story"
 | ------------------------ | --------------------------------------------- |
 | `download-model.sh`      | Download GGUF models from HuggingFace         |
 | `start-llm.sh`           | Start LLM server with auto hardware detection |
+| `start-llm-router.sh`    | Auto-detect and start with optimal model      |
 | `start-llm-optimized.sh` | Start with optimized parameters by model      |
 | `stop-llm.sh`            | Stop the LLM server                           |
+| `list-models.sh`         | List available cached models with sizes       |
 | `llm-client.py`          | CLI client for interacting with the server    |
 | `serve-dashboard.py`     | Web dashboard to monitor server status        |
 | `doctor.py`              | Hardware detection & model recommendations    |
 | `router.py`              | Smart routing CLI with task-type detection    |
+| `swap-completion.bash`   | Bash shell completion for swap command        |
+| `swap-completion.zsh`    | Zsh shell completion for swap command         |
 
 ## Hardware Doctor
 
@@ -236,28 +240,205 @@ Quickly switch between models on a single server:
 
 ```bash
 # Check current status
-python3 scripts/swap-model.py status
+./swap status
 
 # Swap to Qwen
-python3 scripts/swap-model.py qwen
+./swap qwen
 
 # Swap to GLM
+./swap glm
+
+# Or use Python directly
+python3 scripts/swap-model.py status
+python3 scripts/swap-model.py qwen
 python3 scripts/swap-model.py glm
 
-# Or use symlink
-./swap status
-./swap qwen
-./swap glm
+# Swap with custom timeout (for slow loading)
+./swap qwen --wait 120
+
+# Verbose output
+./swap glm --verbose
 ```
 
 The hot-swap automatically:
 
-1. Detects current model
-2. Stops old server gracefully
-3. Starts new model with optimized parameters
-4. Waits for server to be ready
+1. Detects current model and server status
+2. Validates server is running (with process-level fallback detection)
+3. Stops old server gracefully
+4. Starts new model with optimized parameters
+5. Waits for server to be ready (with progress output)
+6. Confirms success with new model name
+
+### Robust Server Detection
+
+The swap mechanism uses multi-level detection to reliably identify server status:
+
+- **API Health Check**: Validates JSON response structure from `/health` endpoint
+- **Retry Logic**: 3 attempts with 1-second backoff for slow API responses
+- **Process-Level Fallback**: Uses `pgrep` to detect llama-server process when API isn't ready yet
+- **Extended Timeout**: 90 seconds default (customizable with `--wait`)
+- **Progress Feedback**: Shows "⏳ Starting..." status during model load
+
+## Server Startup Patterns
+
+The `start-llm.sh` script supports multiple ways to specify models with automatic discovery:
+
+### Pattern 1: Simple Model Name (Case-Insensitive)
+
+```bash
+./scripts/start-llm.sh qwen3-coder-next
+```
+
+- Searches `~/models` first (for local GGUF files)
+- Fallback to cache directory `~/Library/Caches/llama.cpp` (HuggingFace cache)
+- Case-insensitive matching: `qwen3-coder-next` → `unsloth_Qwen3-Coder-Next-GGUF_UD-IQ1_S.gguf`
+- Best for: Quick prototyping, aliases
+
+### Pattern 2: HuggingFace Repository Reference
+
+```bash
+./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF
+```
+
+- Auto-downloads if not cached (first run may take 10+ minutes)
+- Uses latest quantization in cache, or downloads latest from HuggingFace
+- Searches multiple cache locations automatically
+- Best for: Reproducibility, HuggingFace integration
+
+### Pattern 3: HuggingFace with Specific Quantization
+
+```bash
+./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
+./scripts/start-llm.sh unsloth/GLM-4.7-Flash-GGUF:Q4_K_M
+```
+
+- Downloads specific quantization if not cached
+- Format: `org/model:quantization`
+- Best for: Precise control, benchmarking
+
+### Pattern 4: Full File Path
+
+```bash
+./scripts/start-llm.sh /path/to/my-model.gguf
+./scripts/start-llm.sh /Users/you/Downloads/custom-model.gguf
+```
+
+- Direct path to any GGUF file
+- No searching or downloading
+- Best for: Custom quantizations, external models
+
+### Pattern 5: Router (Auto-Start)
+
+```bash
+# Single model with optimized defaults
+./scripts/start-llm-router.sh
+
+# Detects cached models and auto-selects best fit for hardware
+# Creates single-server mode with quick startup
+```
+
+- Automatically detects available cached models
+- Selects best match for your hardware
+- Single model, optimized parameters
+- Best for: One-command startup, minimal configuration
+
+### Model Discovery Behavior
+
+| Pattern     | Search Order      | Download | Auto-Find      |
+| ----------- | ----------------- | -------- | -------------- |
+| Simple name | `~/models`, cache | ❌ No    | ✅ Yes         |
+| HF repo     | Cache, then HF    | ✅ Yes   | ✅ Yes         |
+| HF + quant  | Cache, then HF    | ✅ Yes   | ✅ Yes (exact) |
+| Full path   | Direct            | ❌ No    | ❌ No          |
+| Router      | Cache             | ❌ No    | ✅ Yes         |
+
+### Example Workflows
+
+#### Workflow: Quick Start with Cached Model
+
+```bash
+# Start with simple name (fastest)
+./scripts/start-llm.sh qwen3-coder-next
+
+# Check status
+./swap status
+
+# Make requests
+python scripts/llm-client.py "Write hello world in Python"
+```
+
+#### Workflow: Download and Start Specific Quantization
+
+```bash
+# Download specific quantization
+./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL
+
+# Start with HF reference
+./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL
+
+# Swap to different model
+./swap glm
+
+# Check which model is running
+./swap status
+```
+
+#### Workflow: Multi-Model Switching
+
+```bash
+# Initial startup with router
+./scripts/start-llm-router.sh
+# → Auto-selected Qwen from cache
+
+# Swap to GLM
+./swap glm
+
+# Back to Qwen
+./swap qwen
+
+# Swap with extended timeout (slow loading)
+./swap glm --wait 120
+
+# Verbose output to see what's happening
+./swap qwen --verbose
+```
 
 ## Configuration
+
+### Shell Completions
+
+#### Bash Completion
+
+```bash
+# Add to ~/.bash_profile or ~/.bashrc
+source /path/to/scripts/swap-completion.bash
+```
+
+Then you can use tab completion:
+
+```bash
+./swap <TAB>        # Shows: status qwen glm start stop help
+./swap qwen <TAB>   # Shows: --wait --verbose --help
+```
+
+#### Zsh Completion
+
+```bash
+# Setup zsh completions
+mkdir -p ~/.zsh/completions
+ln -s /path/to/scripts/swap-completion.zsh ~/.zsh/completions/_swap
+
+# Add to ~/.zshrc if not already there
+fpath=(~/.zsh/completions $fpath)
+autoload -Uz compinit && compinit
+```
+
+Then you can use tab completion with descriptions:
+
+```bash
+./swap <TAB>     # Shows all commands with descriptions
+./swap qwen <TAB> # Shows flags for qwen command
+```
 
 ### Environment Variables
 

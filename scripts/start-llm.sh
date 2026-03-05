@@ -192,31 +192,89 @@ check_model_size() {
 		return 0
 	fi
 
-	local model_size_mb
-	model_size_mb=$(stat -f%z "$model_path" 2>/dev/null || stat -c%s "$model_path" 2>/dev/null)
-	model_size_mb=$((model_size_mb / 1024 / 1024))
+	local model_size_bytes
+	model_size_bytes=$(stat -f%z "$model_path" 2>/dev/null || stat -c%s "$model_path" 2>/dev/null)
+	local model_size_mb=$((model_size_bytes / 1024 / 1024))
+	local model_size_gb=$(echo "scale=1; $model_size_mb / 1024" | bc 2>/dev/null || echo "?")
 
 	local ram_gb=$(detect_ram)
 	local usable_mb=$((ram_gb * 1024 * 70 / 100))
 
-	if [ "$model_size_mb" -gt "$usable_mb" ]; then
+	# Extract quantization from filename
+	local filename=$(basename "$model_path")
+	local quant=$(echo "$filename" | grep -oE '_(Q[0-9]_K_[SM]|IQ[0-9]_[SM]|TQ[0-9]_[0-9])' || echo "Unknown")
+
+	# Determine if this is a large model
+	local is_large=false
+	if [[ $filename == *"Qwen3-Coder-Next"* ]] || [[ $filename == *"80B"* ]]; then
+		is_large=true
+	fi
+
+	# Different thresholds based on model size
+	local threshold_mb=$usable_mb
+	local warning=false
+	local critical=false
+
+	if [ "$model_size_mb" -gt $((ram_gb * 1024 * 90 / 100)) ]; then
+		critical=true
+		warning=true
+	elif [ "$model_size_mb" -gt $((ram_gb * 1024 * 75 / 100)) ]; then
+		warning=true
+	fi
+
+	if [ "$warning" = true ]; then
 		echo ""
-		echo "⚠️  WARNING: Model size exceeds ~70% of system RAM"
+		if [ "$critical" = true ]; then
+			echo "🚨 CRITICAL: Model size may cause Out-Of-Memory errors"
+		else
+			echo "⚠️  WARNING: Model size is substantial (~${model_size_gb}GB)"
+		fi
 		echo ""
-		echo "Model:     ${model_size_mb} MB"
-		echo "Safe max:  ~${usable_mb} MB"
+		echo "   Model:          ${model_size_gb}GB (${model_size_mb} MB)"
+		echo "   RAM available:  ${ram_gb}GB"
+		echo "   Quantization:   ${quant}"
 		echo ""
-		echo "This model may cause OOM errors. Recommended alternatives:"
-		echo "  - Use smaller quantization: Q4_K_S instead of Q4_K_M"
-		echo "  - Use smaller model: 14B-32B instead of 70B+"
-		echo "  - Reduce context: --ctx-size 4096"
+
+		if [ "$critical" = true ]; then
+			echo "   This model will likely exceed available memory!"
+			echo ""
+			echo "   Recommended fixes:"
+			if [ "$is_large" = true ]; then
+				echo "     • Use extreme quantization: UD-IQ1_S (vs current)"
+				echo "     • Use smaller model: 32B or 14B instead of 80B"
+				echo "     • Wait for 64GB+ RAM system"
+			else
+				echo "     • Use smaller quantization: Q4_K_S instead of Q4_K_M"
+				echo "     • Use smaller model: 14B instead of 32B+"
+				echo "     • Reduce context: --ctx-size 4096"
+			fi
+		else
+			echo "   This should work but may be slow. Options to improve:"
+			echo "     • Use lighter quantization to free up memory"
+			echo "     • Close other applications to free RAM"
+			echo "     • Reduce context window size"
+		fi
+
 		echo ""
-		echo "Get recommendations: ./download-model.sh --suggest"
+		echo "   Get model recommendations: ./scripts/list-models.sh"
 		echo ""
-		read -p "Continue anyway? (y/N) " -n 1 -r
+
+		if [ "$critical" = true ]; then
+			read -p "   ⚠️  Continue anyway? (y/N) " -n 1 -r
+		else
+			read -p "   Continue? (Y/n) " -n 1 -r
+		fi
 		echo
-		if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-			exit 1
+		if [ "$critical" = true ]; then
+			if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+				echo "   Aborted."
+				exit 1
+			fi
+		else
+			if [[ $REPLY =~ ^[Nn]$ ]]; then
+				echo "   Aborted."
+				exit 1
+			fi
 		fi
 	fi
 }
