@@ -33,6 +33,7 @@ detect_context_size() {
 find_model() {
 	local model_name="$1"
 	local search_dir="$MODELS_DIR"
+	local cache_dir="${HF_HOME:-$HOME/Library/Caches/llama.cpp}"
 
 	if [ -f "$model_name" ]; then
 		echo "$model_name"
@@ -52,7 +53,15 @@ find_model() {
 	done
 
 	local found
-	found=$(find "$search_dir" -maxdepth 2 -name "*${model_name}*" -name "*.gguf" 2>/dev/null | head -1)
+	# Case-insensitive search in MODELS_DIR
+	found=$(find "$search_dir" -maxdepth 2 -iname "*${model_name}*" -name "*.gguf" 2>/dev/null | head -1)
+	if [ -n "$found" ]; then
+		echo "$found"
+		return
+	fi
+
+	# Case-insensitive fallback: Check cache directory for models matching the name
+	found=$(find "$cache_dir" -maxdepth 1 -iname "*${model_name}*" -name "*.gguf" 2>/dev/null | head -1)
 	if [ -n "$found" ]; then
 		echo "$found"
 		return
@@ -69,15 +78,43 @@ resolve_hf_model() {
 	local quant="${model_ref##*:}"
 
 	if [ "$quant" = "$repo" ]; then
-		quant="Q4_K_M"
+		quant="" # No quantization specified, search without it
 	fi
 
 	local repo_slug="${repo//\//_}"
 
 	local found
-	found=$(ls "$cache_dir" 2>/dev/null | grep "^${repo_slug}_.*${quant}\.gguf$" | head -1)
+
+	# Try exact slug + quant match first
+	if [ -n "$quant" ]; then
+		found=$(ls "$cache_dir" 2>/dev/null | grep "^${repo_slug}_.*${quant}\.gguf$" | head -1)
+		if [ -n "$found" ]; then
+			echo "$cache_dir/$found"
+			return
+		fi
+	fi
+
+	# Fallback: Try case-insensitive fuzzy match in cache directory
+	local search_term=$(echo "$repo" | sed 's/\//-/g')
+	if [ -n "$quant" ]; then
+		found=$(find "$cache_dir" -maxdepth 1 -iname "*${search_term}*${quant}*" -name "*.gguf" 2>/dev/null | head -1)
+	else
+		found=$(find "$cache_dir" -maxdepth 1 -iname "*${search_term}*" -name "*.gguf" 2>/dev/null | head -1)
+	fi
 	if [ -n "$found" ]; then
-		echo "$cache_dir/$found"
+		echo "$found"
+		return
+	fi
+
+	# Last resort: Try just the model name
+	local model_name=$(echo "$repo" | awk -F'/' '{print $NF}')
+	if [ -n "$quant" ]; then
+		found=$(find "$cache_dir" -maxdepth 1 -iname "*${model_name}*${quant}*" -name "*.gguf" 2>/dev/null | head -1)
+	else
+		found=$(find "$cache_dir" -maxdepth 1 -iname "*${model_name}*" -name "*.gguf" 2>/dev/null | head -1)
+	fi
+	if [ -n "$found" ]; then
+		echo "$found"
 		return
 	fi
 
@@ -131,10 +168,19 @@ else
 
 	if [ -z "$MODEL_PATH" ]; then
 		echo "Error: Model not found: $MODEL_NAME"
-		echo "Searched in: $MODELS_DIR"
+		echo ""
+		echo "Searched in:"
+		echo "  - $MODELS_DIR"
+		echo "  - $CACHE_DIR"
 		echo ""
 		echo "Available models:"
-		ls -la "$MODELS_DIR" 2>/dev/null || echo "  (directory empty)"
+		ls -1 "$MODELS_DIR" 2>/dev/null | grep -i ".gguf$" || true
+		ls -1 "$CACHE_DIR" 2>/dev/null | grep -i ".gguf$" | head -5 || true
+		echo ""
+		echo "Options:"
+		echo "  1. Download: ./download-model.sh $MODEL_NAME"
+		echo "  2. Use full path: ./scripts/start-llm.sh /path/to/model.gguf"
+		echo "  3. Use HuggingFace ref: ./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S"
 		exit 1
 	fi
 fi
