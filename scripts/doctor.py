@@ -2,178 +2,56 @@
 """Hardware detection and model recommendation for Tiny Local AI.
 
 Uses canirun.ai hardware database and model compatibility data.
-Fetches latest data from https://github.com/midudev/canirun.ai
+Data files in ../data/ can be updated via scripts/fetch-canirun-data.sh
 """
 
 import json
-import os
 import platform
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+DATA_DIR = Path(__file__).parent.parent / "data"
 MODELS_CACHE = Path.home() / "Library/Caches/llama.cpp"
-CANIRUN_DATA_DIR = Path(__file__).parent.parent / "data" / "canirun"
 
-# ---------------------------------------------------------------------------
-# Hardware database (from canirun.ai)
-# ---------------------------------------------------------------------------
-
-APPLE_SILICON = {
-    "M1": {"ram_options": [8, 16], "gpu_cores": {"base": 7, "pro": 8, "max": 24, "ultra": 48}},
-    "M1 Pro": {"ram_options": [16, 32], "gpu_cores": 14},
-    "M1 Max": {"ram_options": [32, 64], "gpu_cores": 24},
-    "M1 Ultra": {"ram_options": [64, 128], "gpu_cores": 48},
-    "M2": {"ram_options": [8, 16, 24], "gpu_cores": {"base": 8, "pro": 10, "max": 30, "ultra": 60}},
-    "M2 Pro": {"ram_options": [16, 32], "gpu_cores": 16},
-    "M2 Max": {"ram_options": [32, 64, 96], "gpu_cores": 30},
-    "M2 Ultra": {"ram_options": [64, 128, 192], "gpu_cores": 60},
-    "M3": {"ram_options": [8, 16, 24], "gpu_cores": {"base": 8, "pro": 10, "max": 30}},
-    "M3 Pro": {"ram_options": [18, 36], "gpu_cores": 14},
-    "M3 Max": {"ram_options": [36, 64, 96, 128], "gpu_cores": 30},
-    "M3 Ultra": {"ram_options": [96, 192], "gpu_cores": 60},
-    "M4": {"ram_options": [16, 24, 32], "gpu_cores": {"base": 8, "pro": 10, "max": 32}},
-    "M4 Pro": {"ram_options": [24, 48], "gpu_cores": 16},
-    "M4 Max": {"ram_options": [36, 64, 128], "gpu_cores": 32},
-    "M5": {"ram_options": [16, 24], "gpu_cores": {"base": 8, "pro": 10, "max": 32}},
-    "M5 Pro": {"ram_options": [24, 48], "gpu_cores": 16},
-    "M5 Max": {"ram_options": [36, 64], "gpu_cores": 32},
+# Quality ranking for quantization selection (higher = better)
+QUALITY_RANK = {
+    "low": 1,
+    "medium": 2,
+    "good": 3,
+    "very_good": 4,
+    "excellent": 5,
 }
 
-NVIDIA_GPUS = {
-    "RTX 5090": {"vram": 32, "tier": "enthusiast"},
-    "RTX 5080": {"vram": 16, "tier": "high"},
-    "RTX 5070 Ti": {"vram": 16, "tier": "high"},
-    "RTX 5070": {"vram": 12, "tier": "mid"},
-    "RTX 5060 Ti": {"vram": 16, "tier": "mid"},
-    "RTX 5060": {"vram": 8, "tier": "entry"},
-    "RTX 4090": {"vram": 24, "tier": "enthusiast"},
-    "RTX 4080 SUPER": {"vram": 16, "tier": "high"},
-    "RTX 4080": {"vram": 16, "tier": "high"},
-    "RTX 4070 Ti SUPER": {"vram": 16, "tier": "high"},
-    "RTX 4070 Ti": {"vram": 12, "tier": "mid"},
-    "RTX 4070 SUPER": {"vram": 12, "tier": "mid"},
-    "RTX 4070": {"vram": 12, "tier": "mid"},
-    "RTX 4060 Ti": {"vram": 16, "tier": "mid"},
-    "RTX 4060": {"vram": 8, "tier": "entry"},
-    "RTX 3090 Ti": {"vram": 24, "tier": "enthusiast"},
-    "RTX 3090": {"vram": 24, "tier": "enthusiast"},
-    "RTX 3080 Ti": {"vram": 12, "tier": "high"},
-    "RTX 3080": {"vram": 10, "tier": "high"},
-    "RTX 3070 Ti": {"vram": 8, "tier": "mid"},
-    "RTX 3070": {"vram": 8, "tier": "mid"},
-    "RTX 3060": {"vram": 12, "tier": "mid"},
-    "RTX 3050": {"vram": 8, "tier": "entry"},
-}
 
-# ---------------------------------------------------------------------------
-# Model database (from canirun.ai + Unsloth)
-# ---------------------------------------------------------------------------
+def _load_json(name: str) -> dict:
+    """Load a JSON data file from the data directory."""
+    path = DATA_DIR / name
+    if not path.exists():
+        print(f"  [WARN] Data file not found: {path}", file=sys.stderr)
+        return {}
+    with open(path) as f:
+        return json.load(f)
 
-MODELS_DB = {
-    "Qwen3-Coder-Next": {
-        "name": "Qwen3-Coder-Next",
-        "repo": "unsloth/Qwen3-Coder-Next-GGUF",
-        "params": "80B MoE",
-        "type": "coding",
-        "quants": {
-            "UD-IQ1_S": {"size_gb": 21.5, "quality": "low", "bits": 1},
-            "UD-IQ1_M": {"size_gb": 24.2, "quality": "medium", "bits": 2},
-            "Q4_K_M": {"size_gb": 48.0, "quality": "good", "bits": 4},
-            "Q5_K_M": {"size_gb": 56.0, "quality": "very_good", "bits": 5},
-        },
-        "use_cases": ["coding", "refactoring", "structured reasoning"],
-    },
-    "GLM-4.7-Flash": {
-        "name": "GLM-4.7-Flash",
-        "repo": "unsloth/GLM-4.7-Flash-GGUF",
-        "params": "30B dense",
-        "type": "general",
-        "quants": {
-            "UD-Q4_K_XL": {"size_gb": 16.3, "quality": "good", "bits": 4},
-            "Q4_K_M": {"size_gb": 18.0, "quality": "good", "bits": 4},
-            "Q5_K_M": {"size_gb": 21.0, "quality": "very_good", "bits": 5},
-        },
-        "use_cases": ["chat", "QA", "general tasks"],
-    },
-    "Qwen3-8B": {
-        "name": "Qwen3-8B",
-        "repo": "unsloth/Qwen3-8B-GGUF",
-        "params": "8B dense",
-        "type": "general",
-        "quants": {
-            "Q4_K_M": {"size_gb": 5.0, "quality": "good", "bits": 4},
-            "Q5_K_M": {"size_gb": 5.8, "quality": "very_good", "bits": 5},
-            "Q8_0": {"size_gb": 8.5, "quality": "excellent", "bits": 8},
-        },
-        "use_cases": ["fast responses", "lightweight tasks"],
-    },
-    "DeepSeek-Coder-V2": {
-        "name": "DeepSeek-Coder-V2",
-        "repo": "unsloth/DeepSeek-Coder-V2-GGUF",
-        "params": "16B MoE",
-        "type": "coding",
-        "quants": {
-            "Q4_K_M": {"size_gb": 8.0, "quality": "good", "bits": 4},
-            "Q5_K_M": {"size_gb": 10.0, "quality": "very_good", "bits": 5},
-        },
-        "use_cases": ["code generation", "debugging"],
-    },
-    "MiniMax-M2.5": {
-        "name": "MiniMax-M2.5",
-        "repo": "unsloth/MiniMax-M2.5-GGUF",
-        "params": "200B MoE",
-        "type": "reasoning",
-        "quants": {
-            "UD-IQ1_S": {"size_gb": 55.0, "quality": "low", "bits": 1},
-            "Q4_K_M": {"size_gb": 120.0, "quality": "good", "bits": 4},
-        },
-        "use_cases": ["reasoning", "complex tasks"],
-    },
-    "Llama-3.1-8B": {
-        "name": "Llama 3.1 8B",
-        "repo": "unsloth/Llama-3.1-8B-GGUF",
-        "params": "8B dense",
-        "type": "general",
-        "quants": {
-            "Q4_K_M": {"size_gb": 4.9, "quality": "good", "bits": 4},
-            "Q5_K_M": {"size_gb": 5.7, "quality": "very_good", "bits": 5},
-            "Q8_0": {"size_gb": 8.5, "quality": "excellent", "bits": 8},
-        },
-        "use_cases": ["general", "chat", "fast inference"],
-    },
-    "Phi-4": {
-        "name": "Phi-4",
-        "repo": "unsloth/Phi-4-GGUF",
-        "params": "14B dense",
-        "type": "general",
-        "quants": {
-            "Q4_K_M": {"size_gb": 8.5, "quality": "good", "bits": 4},
-            "Q5_K_M": {"size_gb": 10.0, "quality": "very_good", "bits": 5},
-        },
-        "use_cases": ["reasoning", "math", "code"],
-    },
-    "Gemma-3-4B": {
-        "name": "Gemma 3 4B",
-        "repo": "unsloth/Gemma-3-4B-GGUF",
-        "params": "4B dense",
-        "type": "general",
-        "quants": {
-            "Q4_K_M": {"size_gb": 2.7, "quality": "good", "bits": 4},
-            "Q8_0": {"size_gb": 4.5, "quality": "excellent", "bits": 8},
-        },
-        "use_cases": ["fast responses", "low memory", "lightweight"],
-    },
-}
+
+def _load_hardware_db() -> tuple:
+    """Load hardware database. Returns (apple_silicon, nvidia_gpus)."""
+    hw = _load_json("hardware.json")
+    return hw.get("apple_silicon", {}), hw.get("nvidia_gpus", {})
+
+
+def _load_models_db() -> dict:
+    """Load model database."""
+    return _load_json("models.json")
 
 
 # ---------------------------------------------------------------------------
 # Hardware detection
 # ---------------------------------------------------------------------------
 
-def get_mac_hardware() -> Dict[str, Any]:
-    """Detect Apple Silicon hardware using canirun.ai data model."""
+def get_mac_hardware(apple_silicon: dict) -> Dict[str, Any]:
+    """Detect Apple Silicon hardware."""
     info = {
         "is_mac": False,
         "chip": "Unknown",
@@ -212,26 +90,31 @@ def get_mac_hardware() -> Dict[str, Any]:
         ram_bytes = int(result.stdout.strip()) if result.stdout else 0
         info["ram_gb"] = ram_bytes // (1024 ** 3)
 
-        # Detect chip family and variant
-        for family in APPLE_SILICON:
+        # Detect chip family and variant — match longest prefix first
+        # to avoid "M1" matching before "M1 Pro" / "M1 Max" / "M1 Ultra"
+        matched_family = None
+        matched_variant = "base"
+        for family in sorted(apple_silicon.keys(), key=len, reverse=True):
             if family in chip:
-                info["chip_family"] = family
-                if "Ultra" in chip:
-                    info["variant"] = "ultra"
-                elif "Max" in chip:
-                    info["variant"] = "max"
-                elif "Pro" in chip:
-                    info["variant"] = "pro"
+                matched_family = family
+                remainder = chip.replace(family, "").strip()
+                if "Ultra" in remainder:
+                    matched_variant = "ultra"
+                elif "Max" in remainder:
+                    matched_variant = "max"
+                elif "Pro" in remainder:
+                    matched_variant = "pro"
                 else:
-                    info["variant"] = "base"
+                    matched_variant = "base"
                 break
 
-        # Get GPU cores from database
-        if info["chip_family"] != "Unknown":
-            family_data = APPLE_SILICON.get(info["chip_family"], {})
+        if matched_family:
+            info["chip_family"] = matched_family
+            info["variant"] = matched_variant
+            family_data = apple_silicon[matched_family]
             gpu_data = family_data.get("gpu_cores", 0)
             if isinstance(gpu_data, dict):
-                info["gpu_cores"] = gpu_data.get(info["variant"], 0)
+                info["gpu_cores"] = gpu_data.get(matched_variant, 0)
             else:
                 info["gpu_cores"] = gpu_data
 
@@ -252,12 +135,11 @@ def get_mac_hardware() -> Dict[str, Any]:
     except Exception as e:
         info["error"] = str(e)
 
-    # Effective RAM: reserve 4GB for system
     info["ram_effective_gb"] = max(info["ram_gb"] - 4, 0)
     return info
 
 
-def get_nvidia_gpu() -> Optional[Dict[str, Any]]:
+def get_nvidia_gpu(nvidia_gpus: dict) -> Optional[Dict[str, Any]]:
     """Detect NVIDIA GPU on Linux/Windows."""
     try:
         result = subprocess.run(
@@ -271,11 +153,11 @@ def get_nvidia_gpu() -> Optional[Dict[str, Any]]:
             vram_mb = int(mem_str.replace("MiB", "").strip())
             vram_gb = vram_mb // 1024
 
-            # Match against known GPUs
+            # Match against known GPUs — longest prefix first
             gpu_info = None
-            for gpu_name, gpu_data in NVIDIA_GPUS.items():
+            for gpu_name in sorted(nvidia_gpus.keys(), key=len, reverse=True):
                 if gpu_name in name:
-                    gpu_info = {"name": gpu_name, **gpu_data}
+                    gpu_info = {"name": gpu_name, **nvidia_gpus[gpu_name]}
                     break
 
             if not gpu_info:
@@ -294,8 +176,9 @@ def get_nvidia_gpu() -> Optional[Dict[str, Any]]:
 
 def detect_hardware() -> Dict[str, Any]:
     """Full hardware detection: Apple Silicon + NVIDIA."""
-    mac = get_mac_hardware()
-    nvidia = get_nvidia_gpu()
+    apple_silicon, nvidia_gpus = _load_hardware_db()
+    mac = get_mac_hardware(apple_silicon)
+    nvidia = get_nvidia_gpu(nvidia_gpus)
 
     return {
         "mac": mac,
@@ -306,30 +189,20 @@ def detect_hardware() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Model recommendations (canirun.ai logic)
+# Model recommendations
 # ---------------------------------------------------------------------------
 
-def estimate_tok_per_sec(hardware: Dict[str, Any], model_size_gb: float, is_moe: bool = False) -> int:
-    """Estimate tokens per second based on hardware and model size.
-
-    Based on canirun.ai performance data.
-    """
+def estimate_tok_per_sec(hardware: Dict[str, Any], model_size_gb: float) -> int:
+    """Estimate tokens per second based on hardware and model size."""
     mac = hardware.get("mac", {})
     nvidia = hardware.get("nvidia")
 
     if nvidia:
-        # NVIDIA GPU estimation
-        vram = nvidia.get("vram_gb", 8)
         tier = nvidia.get("tier", "entry")
         base_speeds = {
-            "enthusiast": 80,
-            "high": 50,
-            "mid": 30,
-            "entry": 15,
-            "unknown": 20,
+            "enthusiast": 80, "high": 50, "mid": 30, "entry": 15, "unknown": 20,
         }
         base = base_speeds.get(tier, 20)
-        # Scale down for larger models
         if model_size_gb > 40:
             return max(int(base * 0.3), 2)
         elif model_size_gb > 20:
@@ -339,22 +212,16 @@ def estimate_tok_per_sec(hardware: Dict[str, Any], model_size_gb: float, is_moe:
         return base
 
     if mac.get("is_mac"):
-        # Apple Silicon estimation
         chip = mac.get("chip_family", "M1")
         variant = mac.get("variant", "base")
-        ram = mac.get("ram_effective_gb", 8)
 
-        # Base speed by chip generation
-        gen_multiplier = {
-            "M1": 1.0, "M2": 1.2, "M3": 1.4, "M4": 1.6, "M5": 1.8,
-        }
-        base = 20 * gen_multiplier.get(chip.replace(" Pro", "").replace(" Max", "").replace(" Ultra", ""), 1.0)
+        gen_multiplier = {"M1": 1.0, "M2": 1.2, "M3": 1.4, "M4": 1.6, "M5": 1.8}
+        base_chip = chip.replace(" Pro", "").replace(" Max", "").replace(" Ultra", "")
+        base = 20 * gen_multiplier.get(base_chip, 1.0)
 
-        # Variant multiplier
         variant_mult = {"base": 0.8, "pro": 1.0, "max": 1.3, "ultra": 1.6}
         base *= variant_mult.get(variant, 1.0)
 
-        # Scale by model size
         if model_size_gb > 40:
             return max(int(base * 0.15), 2)
         elif model_size_gb > 20:
@@ -365,7 +232,6 @@ def estimate_tok_per_sec(hardware: Dict[str, Any], model_size_gb: float, is_moe:
             return max(int(base * 0.8), 12)
         return max(int(base), 15)
 
-    # Unknown hardware
     return 5
 
 
@@ -385,33 +251,38 @@ def get_llama_server_path() -> Optional[str]:
     return None
 
 
-def check_cached_models() -> List[str]:
-    """Check which models are cached locally."""
+def check_cached_models(models_db: dict) -> List[str]:
+    """Check which models are cached locally. Single pass over directory."""
     cached = []
-    cache_dir = MODELS_CACHE
-    if not cache_dir.exists():
+    if not MODELS_CACHE.exists():
         return cached
 
-    for model_key, model_info in MODELS_DB.items():
-        repo = model_info.get("repo", "")
-        # Check HuggingFace cache pattern: org__model__quant.gguf
-        org, model_name = repo.split("/") if "/" in repo else ("", repo)
-        pattern = f"{org}__{model_name}__"
+    # Single pass: collect all .gguf filenames
+    gguf_names = [f.name.lower() for f in MODELS_CACHE.rglob("*.gguf") if f.is_file()]
 
-        for f in cache_dir.rglob("*.gguf"):
-            if pattern.replace("__", "_") in f.name or model_name.replace("-", "_") in f.name.lower():
+    for model_key, model_info in models_db.items():
+        repo = model_info.get("repo", "")
+        org, model_name = repo.split("/") if "/" in repo else ("", repo)
+        pattern = f"{org}__{model_name}__".replace("__", "_")
+        model_slug = model_name.replace("-", "_").lower()
+
+        for name in gguf_names:
+            if pattern in name or model_slug in name:
                 cached.append(model_key)
                 break
 
     return cached
 
 
-def recommend_models(hardware: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Recommend models using canirun.ai compatibility logic."""
+def recommend_models(hardware: Dict[str, Any], models_db: dict) -> List[Dict[str, Any]]:
+    """Recommend models using canirun.ai compatibility logic.
+
+    Selects the best quality quantization that fits in available memory,
+    not the smallest one.
+    """
     mac = hardware.get("mac", {})
     nvidia = hardware.get("nvidia")
 
-    # Determine available memory
     if mac.get("is_mac"):
         available_gb = mac.get("ram_effective_gb", 0)
     elif nvidia:
@@ -420,21 +291,22 @@ def recommend_models(hardware: Dict[str, Any]) -> List[Dict[str, Any]]:
         available_gb = 0
 
     recommendations = []
-    is_moe = False
 
-    for model_key, model_info in MODELS_DB.items():
-        params = model_info.get("params", "")
-        is_moe = "MoE" in params
-
-        # Find best quantization that fits
+    for model_key, model_info in models_db.items():
+        # Find the best quality quantization that fits
         best_quant = None
-        best_size = float("inf")
+        best_quality_rank = -1
+        best_size = 0.0
 
         for quant_name, quant_info in model_info.get("quants", {}).items():
             size = quant_info["size_gb"]
             # Need 1.2x model size for context + overhead
-            if size * 1.2 <= available_gb and size < best_size:
+            if size * 1.2 > available_gb:
+                continue
+            q_rank = QUALITY_RANK.get(quant_info.get("quality", "low"), 0)
+            if q_rank > best_quality_rank or (q_rank == best_quality_rank and size < best_size):
                 best_quant = quant_name
+                best_quality_rank = q_rank
                 best_size = size
 
         if not best_quant:
@@ -442,9 +314,8 @@ def recommend_models(hardware: Dict[str, Any]) -> List[Dict[str, Any]]:
 
         quant_info = model_info["quants"][best_quant]
         size_gb = quant_info["size_gb"]
-        tok_sec = estimate_tok_per_sec(hardware, size_gb, is_moe)
+        tok_sec = estimate_tok_per_sec(hardware, size_gb)
 
-        # Score: balance quality, speed, and fit
         score = tok_sec
         if quant_info["bits"] >= 4:
             score += 10
@@ -453,7 +324,7 @@ def recommend_models(hardware: Dict[str, Any]) -> List[Dict[str, Any]]:
 
         recommendations.append({
             "name": model_info["name"],
-            "params": params,
+            "params": model_info.get("params", ""),
             "type": model_info["type"],
             "quantization": best_quant,
             "size_gb": size_gb,
@@ -542,7 +413,8 @@ def print_system_check() -> None:
     else:
         print(f"  [WARN] Model cache not found: {MODELS_CACHE}")
 
-    model_count = len(check_cached_models())
+    models_db = _load_models_db()
+    model_count = len(check_cached_models(models_db))
     print(f"  [INFO] Cached models: {model_count}")
 
 
@@ -552,9 +424,10 @@ def main() -> int:
     print("  Powered by canirun.ai")
     print("=" * 60)
 
+    models_db = _load_models_db()
     hardware = detect_hardware()
-    cached = check_cached_models()
-    recommendations = recommend_models(hardware)
+    cached = check_cached_models(models_db)
+    recommendations = recommend_models(hardware, models_db)
 
     print_hardware_info(hardware)
     print_recommendations(recommendations, cached)

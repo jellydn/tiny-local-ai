@@ -30,45 +30,18 @@ suggest_quant() {
 	echo ""
 	echo "=== Hardware Analysis ==="
 	echo "GPU Memory: ~${mem_mb} MB (~$(echo "scale=1; $mem_mb/1024" | bc) GB)"
-
-	echo ""
-	echo "For detailed model recommendations, run:"
-	echo "  python3 scripts/doctor.py"
-	echo ""
-	echo "Or visit: https://www.canirun.ai/"
 	echo ""
 
 	local usable_mb=$((mem_mb * 80 / 100))
 	echo "Usable (80%): ~${usable_mb} MB (~$(echo "scale=1; $usable_mb/1024" | bc) GB)"
 	echo ""
 
-	if [ "$mem_mb" -ge 32000 ]; then
-		echo "=== 32GB+ System ==="
-		echo "Supports: 80B MoE (extreme quant), 30B dense, 14B, 8B"
-		echo "Qwen3-Coder-Next-80B UD-IQ1_S (~21.5GB) - coding, 2-4 tok/s"
-		echo "GLM-4.7-Flash Q4_K_M (~18GB) - general, 15-25 tok/s"
-		echo "MiniMax-M2.5 Q4_K_M (~120GB) - reasoning (needs 96GB+)"
-		echo "Run './scripts/doctor.py' for full list."
-	elif [ "$mem_mb" -ge 24000 ]; then
-		echo "=== 24GB System ==="
-		echo "Supports: 30B dense, 14B, 8B"
-		echo "GLM-4.7-Flash Q4_K_M (~18GB) - general, 15-25 tok/s"
-		echo "Qwen3-8B Q4_K_M (~5GB) - fast, 20-35 tok/s"
-	elif [ "$mem_mb" -ge 16000 ]; then
-		echo "=== 16GB System ==="
-		echo "Supports: 14B, 8B, 4B"
-		echo "Qwen3-8B Q4_K_M (~5GB) - general, 15-25 tok/s"
-		echo "Phi-4 Q4_K_M (~8.5GB) - reasoning, 10-20 tok/s"
-		echo "Gemma-3-4B Q4_K_M (~2.7GB) - fast, 25-40 tok/s"
-	elif [ "$mem_mb" -ge 10000 ]; then
-		echo "=== 8-10GB System ==="
-		echo "Supports: 8B, 4B"
-		echo "Gemma-3-4B Q4_K_M (~2.7GB) - fast, 25-40 tok/s"
-		echo "Qwen3-8B Q4_K_S (~4GB) - general, 20-30 tok/s"
+	# Delegate to doctor.py for model recommendations (single source of truth)
+	if command -v python3 &>/dev/null; then
+		python3 "$SCRIPT_DIR/doctor.py" 2>/dev/null
 	else
-		echo "=== Low Memory System ==="
-		echo "Recommended: 4B models"
-		echo "Gemma-3-4B Q8_0 (~4.5GB) or Q4_K_M (~2.7GB)"
+		echo "python3 not found. For detailed recommendations, visit:"
+		echo "  https://www.canirun.ai/"
 	fi
 
 	echo ""

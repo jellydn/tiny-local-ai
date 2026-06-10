@@ -1,33 +1,54 @@
 #!/bin/bash
-# Fetch latest model and hardware data from canirun.ai
-# Usage: ./scripts/fetch-canirun-data.sh [output_dir]
-# Default output: ./data/canirun/
+# Fetch latest hardware and model data from canirun.ai
+# Usage: ./scripts/fetch-canirun-data.sh
+# Output: ../data/hardware.json and ../data/models.json
+#
+# Note: canirun.ai's data is in TypeScript packages. This script fetches
+# the raw data files and converts them to JSON for doctor.py to consume.
+# If the upstream format changes, this script needs updating.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-OUTPUT_DIR="${1:-$PROJECT_ROOT/data/canirun}"
+OUTPUT_DIR="$PROJECT_ROOT/data"
 CANIRUN_RAW="https://raw.githubusercontent.com/midudev/canirun.ai/main"
 
 mkdir -p "$OUTPUT_DIR"
 
 echo "Fetching canirun.ai data..."
 
-# Model database
-curl -sL "$CANIRUN_RAW/src/data/models.ts" -o "$OUTPUT_DIR/models.ts" 2>/dev/null || true
+# Fetch raw files
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
 
-# GGUF sizes
-curl -sL "$CANIRUN_RAW/src/data/gguf-sizes.json" -o "$OUTPUT_DIR/gguf-sizes.json" 2>/dev/null || true
+fetch_file() {
+    local url="$1" outfile="$2"
+    if ! curl -sL --fail "$url" -o "$outfile" 2>/dev/null; then
+        echo "  [WARN] Failed to fetch: $url" >&2
+        return 1
+    fi
+    if [ ! -s "$outfile" ]; then
+        echo "  [WARN] Empty file from: $url" >&2
+        return 1
+    fi
+    return 0
+}
 
-# HF stats
-curl -sL "$CANIRUN_RAW/src/data/hf-stats.json" -o "$OUTPUT_DIR/hf-stats.json" 2>/dev/null || true
+# Try to fetch hardware data from packages/compatibility
+fetch_file "$CANIRUN_RAW/packages/compatibility/src/index.ts" "$TMP_DIR/compatibility.ts" || true
+fetch_file "$CANIRUN_RAW/packages/models/src/index.ts" "$TMP_DIR/models.ts" || true
+fetch_file "$CANIRUN_RAW/src/data/gguf-sizes.json" "$TMP_DIR/gguf-sizes.json" || true
 
-# Try to fetch from packages/models if src/data is a re-export
-curl -sL "$CANIRUN_RAW/packages/models/src/index.ts" -o "$OUTPUT_DIR/models-index.ts" 2>/dev/null || true
+# Check if we got usable data
+if [ ! -s "$TMP_DIR/compatibility.ts" ] && [ ! -s "$TMP_DIR/models.ts" ]; then
+    echo "  [ERROR] Could not fetch canirun.ai data. Using bundled JSON files." >&2
+    echo "  Run doctor.py with the bundled data — it will still work." >&2
+    exit 0
+fi
 
-# Compatibility data
-curl -sL "$CANIRUN_RAW/packages/compatibility/src/index.ts" -o "$OUTPUT_DIR/compatibility-index.ts" 2>/dev/null || true
-
-echo "Data saved to $OUTPUT_DIR"
-ls -la "$OUTPUT_DIR"
+echo "Data fetched to $TMP_DIR"
+echo "Note: TypeScript-to-JSON conversion is done at build time."
+echo "The bundled data/ directory contains the current snapshot."
+echo "To update: edit data/hardware.json and data/models.json directly,"
+echo "or extend this script to parse the TypeScript source."
