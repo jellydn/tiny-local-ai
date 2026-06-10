@@ -370,7 +370,7 @@ def print_hardware_info(hardware: Dict[str, Any]) -> None:
         print(f"  Tier:                 {nvidia.get('tier', 'Unknown')}")
     else:
         print(f"  Platform:             {hardware.get('platform', 'Unknown')}")
-        print(f"  Note:                 Apple Silicon or NVIDIA GPU required for local inference")
+        print("  Note:                 Apple Silicon or NVIDIA GPU required for local inference")
 
 
 def print_recommendations(recommendations: List[Dict[str, Any]], cached: List[str]) -> None:
@@ -394,28 +394,26 @@ def print_recommendations(recommendations: List[Dict[str, Any]], cached: List[st
             f"{model['type']:<12}{cached_mark}"
         )
 
-    print(f"\n  Data source: https://www.canirun.ai/")
-    print(f"  Model source: https://unsloth.ai/")
+    print("\n  Data source: https://www.canirun.ai/")
+    print("  Model source: https://unsloth.ai/")
 
 
-def print_system_check() -> None:
+def print_system_check(cached: List[str]) -> None:
     print_header("SYSTEM CHECK")
 
     llama_path = get_llama_server_path()
     if llama_path:
         print(f"  [OK] llama-server: {llama_path}")
     else:
-        print(f"  [MISSING] llama-server not found")
-        print(f"           Install: brew install llama.cpp")
+        print("  [MISSING] llama-server not found")
+        print("           Install: brew install llama.cpp")
 
     if MODELS_CACHE.exists():
         print(f"  [OK] Model cache: {MODELS_CACHE}")
     else:
         print(f"  [WARN] Model cache not found: {MODELS_CACHE}")
 
-    models_db = _load_models_db()
-    model_count = len(check_cached_models(models_db))
-    print(f"  [INFO] Cached models: {model_count}")
+    print(f"  [INFO] Cached models: {len(cached)}")
 
 
 def main() -> int:
@@ -431,7 +429,7 @@ def main() -> int:
 
     print_hardware_info(hardware)
     print_recommendations(recommendations, cached)
-    print_system_check()
+    print_system_check(cached)
 
     print(f"\n{'=' * 60}")
     print("  Diagnostics complete")
