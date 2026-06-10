@@ -44,11 +44,32 @@ fetch_file "$CANIRUN_RAW/src/data/gguf-sizes.json" "$TMP_DIR/gguf-sizes.json" ||
 if [ ! -s "$TMP_DIR/compatibility.ts" ] && [ ! -s "$TMP_DIR/models.ts" ]; then
     echo "  [ERROR] Could not fetch canirun.ai data. Using bundled JSON files." >&2
     echo "  Run doctor.py with the bundled data — it will still work." >&2
-    exit 0
+    exit 1
 fi
 
-echo "Data fetched to $TMP_DIR"
-echo "Note: TypeScript-to-JSON conversion is done at build time."
+# Validate downloaded files and report status
+echo ""
+echo "Downloaded files:"
+failed=0
+for file in compatibility.ts models.ts gguf-sizes.json; do
+    if [ -f "$TMP_DIR/$file" ] && [ -s "$TMP_DIR/$file" ]; then
+        echo "  ✓ $file"
+    else
+        echo "  ✗ $file (missing or empty)"
+        failed=$((failed + 1))
+    done
+done
+
+# Note: TypeScript-to-JSON conversion is not yet implemented.
+# The bundled data/ directory contains the current snapshot.
+# To update: edit data/hardware.json and data/models.json directly.
+echo ""
+echo "Note: TypeScript-to-JSON conversion is not yet implemented."
 echo "The bundled data/ directory contains the current snapshot."
-echo "To update: edit data/hardware.json and data/models.json directly,"
-echo "or extend this script to parse the TypeScript source."
+echo "To update: edit data/hardware.json and data/models.json directly."
+
+if [ "$failed" -ge 3 ]; then
+    echo ""
+    echo "  [ERROR] All downloads failed." >&2
+    exit 1
+fi

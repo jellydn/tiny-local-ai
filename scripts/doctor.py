@@ -263,7 +263,8 @@ def check_cached_models(models_db: dict) -> List[str]:
     for model_key, model_info in models_db.items():
         repo = model_info.get("repo", "")
         org, model_name = repo.split("/") if "/" in repo else ("", repo)
-        pattern = f"{org}__{model_name}__".replace("__", "_")
+        # Lowercase the pattern to match the lowercased gguf_names
+        pattern = f"{org}__{model_name}__".replace("__", "_").lower()
         model_slug = model_name.replace("-", "_").lower()
 
         for name in gguf_names:
@@ -323,6 +324,7 @@ def recommend_models(hardware: Dict[str, Any], models_db: dict) -> List[Dict[str
             score += 5
 
         recommendations.append({
+            "key": model_key,
             "name": model_info["name"],
             "params": model_info.get("params", ""),
             "type": model_info["type"],
@@ -385,9 +387,7 @@ def print_recommendations(recommendations: List[Dict[str, Any]], cached: List[st
     print(f"  {'-'*4} {'-'*25} {'-'*8} {'-'*12} {'-'*8} {'-'*12}")
 
     for i, model in enumerate(recommendations[:8], 1):
-        cached_mark = " [cached]" if model["name"].replace(" ", "-").replace(".", "-") in [
-            c.replace(" ", "-") for c in cached
-        ] else ""
+        cached_mark = " [cached]" if model.get("key") in cached else ""
         print(
             f"  {i:<4} {model['name']:<25} {model['size_gb']:<8.1f} "
             f"{model['quantization']:<12} {model['estimated_tok_sec']:<8} "

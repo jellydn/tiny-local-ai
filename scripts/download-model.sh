@@ -45,6 +45,8 @@ suggest_quant() {
 	fi
 
 	echo ""
+	echo "For the full list, run: python3 scripts/doctor.py"
+	echo ""
 	echo "Data powered by canirun.ai"
 }
 
@@ -227,9 +229,6 @@ list_available_models() {
 		echo ""
 		echo "Usage: $0 <repo>:<quant>"
 		echo "Example: $0 $repo:Q4_K_M"
-		echo "Example: $0 $repo:UD-Q4_K_XL"
-		echo ""
-		echo "Usage: $0 <repo>:<quant>"
 		echo "Example: $0 $repo:UD-Q4_K_XL"
 	else
 		echo "Could not fetch model list. Make sure the repository exists."
