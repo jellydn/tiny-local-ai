@@ -54,12 +54,15 @@ for file in compatibility.ts models.ts gguf-sizes.json; do
 done
 
 # Note: TypeScript-to-JSON conversion is not yet implemented.
-# The bundled data/ directory contains the current snapshot.
-# To update: edit data/hardware.json and data/models.json directly.
+# This script validates canirun.ai upstream is reachable and the bundled
+# data/ directory still matches the expected shape. It does NOT regenerate
+# data/*.json — those are committed snapshots maintained by the project.
+# If you need to refresh hardware or model data, see scripts/doctor.py
+# (which reads the bundled JSON) and the canirun.ai data fetch workflow.
 echo ""
 echo "Note: TypeScript-to-JSON conversion is not yet implemented."
-echo "The bundled data/ directory contains the current snapshot."
-echo "To update: edit data/hardware.json and data/models.json directly."
+echo "data/*.json are maintained as committed snapshots."
+echo "Run scripts/doctor.py to see the current recommendations."
 
 # Ensure we got usable core data (at least one of compatibility.ts or models.ts must exist and be non-empty)
 if [ ! -s "$TMP_DIR/compatibility.ts" ] && [ ! -s "$TMP_DIR/models.ts" ]; then

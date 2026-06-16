@@ -154,7 +154,10 @@ def get_nvidia_gpu(nvidia_gpus: dict) -> dict[str, Any] | None:
             timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
-            parts = result.stdout.strip().split(",")
+            # nvidia-smi emits one line per GPU; .split(",") on the whole
+            # blob collapses multi-GPU rows incorrectly. Take the first line.
+            first_line = result.stdout.strip().splitlines()[0]
+            parts = first_line.split(",")
             name = parts[0].strip()
             mem_str = parts[1].strip() if len(parts) > 1 else "0 MiB"
             vram_mb = int(mem_str.replace("MiB", "").strip())
@@ -274,7 +277,11 @@ def check_cached_models(models_db: dict) -> list[str]:
 
     for model_key, model_info in models_db.items():
         repo = model_info.get("repo", "")
-        org, model_name = repo.split("/") if "/" in repo else ("", repo)
+        if "/" not in repo:
+            # Repos without an org prefix can't be matched against cached
+            # filenames with a stable pattern; skip to avoid false positives.
+            continue
+        org, model_name = repo.split("/", 1)
         # Lowercase the pattern to match the lowercased gguf_names
         pattern = f"{org}__{model_name}__".replace("__", "_").lower()
         model_slug = model_name.replace("-", "_").lower()
