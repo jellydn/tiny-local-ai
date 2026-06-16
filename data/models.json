@@ -38,29 +38,30 @@
   },
   "DeepSeek-Coder-V2": {
     "name": "DeepSeek-Coder-V2",
-    "repo": "unsloth/DeepSeek-Coder-V2-GGUF",
+    "repo": "bartowski/DeepSeek-Coder-V2-Instruct-GGUF",
     "params": "16B MoE",
     "type": "coding",
     "quants": {
-      "Q4_K_M": {"size_gb": 8.0, "quality": "good", "bits": 4},
-      "Q5_K_M": {"size_gb": 10.0, "quality": "very_good", "bits": 5}
+      "Q3_K_XL": {"size_gb": 6.5, "quality": "medium", "bits": 3},
+      "Q4_K_M": {"size_gb": 8.0, "quality": "good", "bits": 4}
     },
     "use_cases": ["code generation", "debugging"]
   },
-  "MiniMax-M2.5": {
-    "name": "MiniMax-M2.5",
-    "repo": "unsloth/MiniMax-M2.5-GGUF",
-    "params": "200B MoE",
+  "DeepSeek-R1-Distill-Llama-8B": {
+    "name": "DeepSeek-R1-Distill-Llama-8B",
+    "repo": "unsloth/DeepSeek-R1-Distill-Llama-8B-GGUF",
+    "params": "8B dense",
     "type": "reasoning",
     "quants": {
-      "UD-IQ1_S": {"size_gb": 55.0, "quality": "low", "bits": 1},
-      "Q4_K_M": {"size_gb": 120.0, "quality": "good", "bits": 4}
+      "Q4_K_M": {"size_gb": 4.9, "quality": "good", "bits": 4},
+      "Q5_K_M": {"size_gb": 5.7, "quality": "very_good", "bits": 5},
+      "Q8_0": {"size_gb": 8.5, "quality": "excellent", "bits": 8}
     },
-    "use_cases": ["reasoning", "complex tasks"]
+    "use_cases": ["reasoning", "math", "complex analysis"]
   },
   "Llama-3.1-8B": {
     "name": "Llama 3.1 8B",
-    "repo": "unsloth/Llama-3.1-8B-GGUF",
+    "repo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
     "params": "8B dense",
     "type": "general",
     "quants": {
@@ -72,7 +73,7 @@
   },
   "Phi-4": {
     "name": "Phi-4",
-    "repo": "unsloth/Phi-4-GGUF",
+    "repo": "bartowski/phi-4-GGUF",
     "params": "14B dense",
     "type": "general",
     "quants": {
@@ -83,7 +84,7 @@
   },
   "Gemma-3-4B": {
     "name": "Gemma 3 4B",
-    "repo": "unsloth/Gemma-3-4B-GGUF",
+    "repo": "unsloth/gemma-3-4b-it-GGUF",
     "params": "4B dense",
     "type": "general",
     "quants": {

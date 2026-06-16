@@ -3,15 +3,13 @@
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from openai import OpenAI
-
 
 # Configuration
 MODELS_CACHE = Path.home() / "Library/Caches/llama.cpp"
@@ -32,7 +30,7 @@ MODELS = {
 }
 
 
-def load_prompts() -> List[Dict[str, Any]]:
+def load_prompts() -> list[dict[str, Any]]:
     """Load test prompts from JSON file."""
     if not BENCHMARK_PROMPTS.exists():
         print(f"Error: {BENCHMARK_PROMPTS} not found", file=sys.stderr)
@@ -43,7 +41,7 @@ def load_prompts() -> List[Dict[str, Any]]:
     return data.get("prompts", [])
 
 
-def start_server(model_key: str, dry_run: bool = False) -> Optional[subprocess.Popen]:
+def start_server(model_key: str, dry_run: bool = False) -> subprocess.Popen | None:
     """Start llama-server with the specified model."""
     model_info = MODELS[model_key]
     model_path = model_info["path"]
@@ -103,7 +101,7 @@ def wait_for_server(port: int, timeout: int = 60) -> bool:
     return False
 
 
-def stop_server(process: Optional[subprocess.Popen]) -> None:
+def stop_server(process: subprocess.Popen | None) -> None:
     """Stop the llama-server process."""
     if process is None:
         return
@@ -122,7 +120,7 @@ def measure_prompt(
     prompt: str,
     timeout: int = 300,
     max_tokens: int = 512,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run a single prompt and measure latency metrics.
 
     Args:
@@ -174,12 +172,12 @@ def measure_prompt(
 
 def run_benchmark_for_model(
     model_key: str,
-    prompts: List[Dict[str, Any]],
-    categories: Optional[List[str]] = None,
+    prompts: list[dict[str, Any]],
+    categories: list[str] | None = None,
     dry_run: bool = False,
     timeout: int = 300,
     max_tokens: int = 512,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run benchmark for a single model.
 
     Args:
@@ -246,7 +244,7 @@ def run_benchmark_for_model(
         )
 
     stop_server(server_process)
-    print(f"\nStopping server... ✓")
+    print("\nStopping server... ✓")
 
     summary = compute_summary(results)
 
@@ -258,7 +256,7 @@ def run_benchmark_for_model(
     }
 
 
-def compute_summary(results: list[dict[str, Any]]) -> Dict[str, Any]:
+def compute_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
     """Compute summary statistics for benchmark results."""
     successful = [r for r in results if r.get("status") == "success"]
 

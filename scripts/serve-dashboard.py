@@ -5,10 +5,9 @@ import argparse
 import json
 import os
 import sys
-import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.request import urlopen
 from urllib.error import URLError
+from urllib.request import urlopen
 
 DEFAULT_URL = os.getenv("LLM_SERVER_URL", "http://localhost:8000")
 

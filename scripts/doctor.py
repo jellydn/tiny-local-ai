@@ -10,7 +10,7 @@ import platform
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 MODELS_CACHE = Path.home() / "Library/Caches/llama.cpp"
@@ -50,7 +50,8 @@ def _load_models_db() -> dict:
 # Hardware detection
 # ---------------------------------------------------------------------------
 
-def get_mac_hardware(apple_silicon: dict) -> Dict[str, Any]:
+
+def get_mac_hardware(apple_silicon: dict) -> dict[str, Any]:
     """Detect Apple Silicon hardware."""
     info = {
         "is_mac": False,
@@ -73,22 +74,25 @@ def get_mac_hardware(apple_silicon: dict) -> Dict[str, Any]:
     try:
         chip = subprocess.run(
             ["sysctl", "-n", "machdep.cpu.brand_string"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         ).stdout.strip()
         info["chip"] = chip if chip else "Apple Silicon"
 
         result = subprocess.run(
             ["sysctl", "-n", "hw.ncpu"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         info["cpu_cores"] = int(result.stdout.strip()) if result.stdout else 0
 
         result = subprocess.run(
             ["sysctl", "-n", "hw.memsize"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         ram_bytes = int(result.stdout.strip()) if result.stdout else 0
-        info["ram_gb"] = ram_bytes // (1024 ** 3)
+        info["ram_gb"] = ram_bytes // (1024**3)
 
         # Detect chip family and variant — match longest prefix first
         # to avoid "M1" matching before "M1 Pro" / "M1 Max" / "M1 Ultra"
@@ -121,7 +125,8 @@ def get_mac_hardware(apple_silicon: dict) -> Dict[str, Any]:
         # Check Metal support
         result = subprocess.run(
             ["system_profiler", "SPDisplaysDataType"],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         if "Apple" in result.stdout:
             info["metal_available"] = True
@@ -139,12 +144,14 @@ def get_mac_hardware(apple_silicon: dict) -> Dict[str, Any]:
     return info
 
 
-def get_nvidia_gpu(nvidia_gpus: dict) -> Optional[Dict[str, Any]]:
+def get_nvidia_gpu(nvidia_gpus: dict) -> dict[str, Any] | None:
     """Detect NVIDIA GPU on Linux/Windows."""
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
             parts = result.stdout.strip().split(",")
@@ -174,7 +181,7 @@ def get_nvidia_gpu(nvidia_gpus: dict) -> Optional[Dict[str, Any]]:
     return None
 
 
-def detect_hardware() -> Dict[str, Any]:
+def detect_hardware() -> dict[str, Any]:
     """Full hardware detection: Apple Silicon + NVIDIA."""
     apple_silicon, nvidia_gpus = _load_hardware_db()
     mac = get_mac_hardware(apple_silicon)
@@ -192,7 +199,8 @@ def detect_hardware() -> Dict[str, Any]:
 # Model recommendations
 # ---------------------------------------------------------------------------
 
-def estimate_tok_per_sec(hardware: Dict[str, Any], model_size_gb: float) -> int:
+
+def estimate_tok_per_sec(hardware: dict[str, Any], model_size_gb: float) -> int:
     """Estimate tokens per second based on hardware and model size."""
     mac = hardware.get("mac", {})
     nvidia = hardware.get("nvidia")
@@ -200,7 +208,11 @@ def estimate_tok_per_sec(hardware: Dict[str, Any], model_size_gb: float) -> int:
     if nvidia:
         tier = nvidia.get("tier", "entry")
         base_speeds = {
-            "enthusiast": 80, "high": 50, "mid": 30, "entry": 15, "unknown": 20,
+            "enthusiast": 80,
+            "high": 50,
+            "mid": 30,
+            "entry": 15,
+            "unknown": 20,
         }
         base = base_speeds.get(tier, 20)
         if model_size_gb > 40:
@@ -235,7 +247,7 @@ def estimate_tok_per_sec(hardware: Dict[str, Any], model_size_gb: float) -> int:
     return 5
 
 
-def get_llama_server_path() -> Optional[str]:
+def get_llama_server_path() -> str | None:
     """Find llama-server binary."""
     paths = [
         "/opt/homebrew/bin/llama-server",
@@ -251,7 +263,7 @@ def get_llama_server_path() -> Optional[str]:
     return None
 
 
-def check_cached_models(models_db: dict) -> List[str]:
+def check_cached_models(models_db: dict) -> list[str]:
     """Check which models are cached locally. Single pass over directory."""
     cached = []
     if not MODELS_CACHE.exists():
@@ -275,7 +287,7 @@ def check_cached_models(models_db: dict) -> List[str]:
     return cached
 
 
-def recommend_models(hardware: Dict[str, Any], models_db: dict) -> List[Dict[str, Any]]:
+def recommend_models(hardware: dict[str, Any], models_db: dict) -> list[dict[str, Any]]:
     """Recommend models using canirun.ai compatibility logic.
 
     Selects the best quality quantization that fits in available memory,
@@ -320,22 +332,24 @@ def recommend_models(hardware: Dict[str, Any], models_db: dict) -> List[Dict[str
         score = tok_sec
         if quant_info["bits"] >= 4:
             score += 10
-        if model_info["type"] == "coding":
+        if model_info["type"] in ("coding", "reasoning"):
             score += 5
 
-        recommendations.append({
-            "key": model_key,
-            "name": model_info["name"],
-            "params": model_info.get("params", ""),
-            "type": model_info["type"],
-            "quantization": best_quant,
-            "size_gb": size_gb,
-            "quality": quant_info["quality"],
-            "estimated_tok_sec": tok_sec,
-            "use_cases": model_info["use_cases"],
-            "repo": model_info["repo"],
-            "score": score,
-        })
+        recommendations.append(
+            {
+                "key": model_key,
+                "name": model_info["name"],
+                "params": model_info.get("params", ""),
+                "type": model_info["type"],
+                "quantization": best_quant,
+                "size_gb": size_gb,
+                "quality": quant_info["quality"],
+                "estimated_tok_sec": tok_sec,
+                "use_cases": model_info["use_cases"],
+                "repo": model_info["repo"],
+                "score": score,
+            }
+        )
 
     return sorted(recommendations, key=lambda x: x["score"], reverse=True)
 
@@ -344,13 +358,14 @@ def recommend_models(hardware: Dict[str, Any], models_db: dict) -> List[Dict[str
 # Output
 # ---------------------------------------------------------------------------
 
+
 def print_header(title: str) -> None:
     print(f"\n{'=' * 60}")
     print(f"  {title}")
     print(f"{'=' * 60}")
 
 
-def print_hardware_info(hardware: Dict[str, Any]) -> None:
+def print_hardware_info(hardware: dict[str, Any]) -> None:
     print_header("DETECTED HARDWARE")
 
     mac = hardware.get("mac", {})
@@ -375,7 +390,7 @@ def print_hardware_info(hardware: Dict[str, Any]) -> None:
         print("  Note:                 Apple Silicon or NVIDIA GPU required for local inference")
 
 
-def print_recommendations(recommendations: List[Dict[str, Any]], cached: List[str]) -> None:
+def print_recommendations(recommendations: list[dict[str, Any]], cached: list[str]) -> None:
     print_header("RECOMMENDED MODELS (via canirun.ai)")
 
     if not recommendations:
@@ -383,8 +398,13 @@ def print_recommendations(recommendations: List[Dict[str, Any]], cached: List[st
         print("  Visit https://www.canirun.ai/ for more options.")
         return
 
+    # Paths are printed in repo-root-relative form (assume CWD is repo root,
+    # which matches the convention used throughout AGENTS.md).
+    download_script = "./scripts/download-model.sh"
+    start_script = "./scripts/start-llm.sh"
+
     print(f"  {'#':<4} {'Model':<25} {'Size':<8} {'Quant':<12} {'tok/s':<8} {'Type':<12}")
-    print(f"  {'-'*4} {'-'*25} {'-'*8} {'-'*12} {'-'*8} {'-'*12}")
+    print(f"  {'-' * 4} {'-' * 25} {'-' * 8} {'-' * 12} {'-' * 8} {'-' * 12}")
 
     for i, model in enumerate(recommendations[:8], 1):
         cached_mark = " [cached]" if model.get("key") in cached else ""
@@ -393,12 +413,18 @@ def print_recommendations(recommendations: List[Dict[str, Any]], cached: List[st
             f"{model['quantization']:<12} {model['estimated_tok_sec']:<8} "
             f"{model['type']:<12}{cached_mark}"
         )
+        if model.get("key") in cached:
+            # Use simple model key to match start-llm.sh's simple-name branch
+            print(f"       ✓ Already cached — run: {start_script} {model['key']}")
+        else:
+            print(f"       verify → {download_script} --list {model['repo']}")
+            print(f"       download → {download_script} {model['repo']}:{model['quantization']}")
 
     print("\n  Data source: https://www.canirun.ai/")
     print("  Model source: https://unsloth.ai/")
 
 
-def print_system_check(cached: List[str]) -> None:
+def print_system_check(cached: list[str]) -> None:
     print_header("SYSTEM CHECK")
 
     llama_path = get_llama_server_path()
