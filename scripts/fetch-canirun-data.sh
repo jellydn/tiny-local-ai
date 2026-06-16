@@ -40,13 +40,6 @@ fetch_file "$CANIRUN_RAW/packages/compatibility/src/index.ts" "$TMP_DIR/compatib
 fetch_file "$CANIRUN_RAW/packages/models/src/index.ts" "$TMP_DIR/models.ts" || true
 fetch_file "$CANIRUN_RAW/src/data/gguf-sizes.json" "$TMP_DIR/gguf-sizes.json" || true
 
-# Check if we got usable data
-if [ ! -s "$TMP_DIR/compatibility.ts" ] && [ ! -s "$TMP_DIR/models.ts" ]; then
-    echo "  [ERROR] Could not fetch canirun.ai data. Using bundled JSON files." >&2
-    echo "  Run doctor.py with the bundled data — it will still work." >&2
-    exit 1
-fi
-
 # Validate downloaded files and report status
 echo ""
 echo "Downloaded files:"
@@ -68,8 +61,10 @@ echo "Note: TypeScript-to-JSON conversion is not yet implemented."
 echo "The bundled data/ directory contains the current snapshot."
 echo "To update: edit data/hardware.json and data/models.json directly."
 
-if [ "$failed" -ge 3 ]; then
+# Ensure we got usable core data (at least one of compatibility.ts or models.ts must exist and be non-empty)
+if [ ! -s "$TMP_DIR/compatibility.ts" ] && [ ! -s "$TMP_DIR/models.ts" ]; then
     echo ""
-    echo "  [ERROR] All downloads failed." >&2
+    echo "  [ERROR] Could not fetch core canirun.ai data. Using bundled JSON files." >&2
+    echo "  Run doctor.py with the bundled data — it will still work." >&2
     exit 1
 fi
