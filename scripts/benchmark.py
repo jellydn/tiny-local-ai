@@ -87,7 +87,6 @@ def start_server(model_key: str, dry_run: bool = False) -> subprocess.Popen | No
 
 def wait_for_server(port: int, timeout: int = 60) -> bool:
     """Wait for server to be ready on the specified port."""
-    url = f"http://localhost:{port}/health"
     start = time.time()
 
     while time.time() - start < timeout:
@@ -133,7 +132,6 @@ def measure_prompt(
     start_time = time.time()
     ttft = None
     token_count = 0
-    first_token_time = None
 
     try:
         response = client.chat.completions.create(
@@ -213,9 +211,7 @@ def run_benchmark_for_model(
         stop_server(server_process)
         sys.exit(1)
 
-    client = OpenAI(
-        base_url=f"http://localhost:{model_info['port']}/v1", api_key="sk-no-key"
-    )
+    client = OpenAI(base_url=f"http://localhost:{model_info['port']}/v1", api_key="sk-no-key")
 
     results = []
     for i, prompt_data in enumerate(filtered_prompts, 1):
@@ -342,9 +338,7 @@ def format_comparison(qwen_data: dict[str, Any], glm_data: dict[str, Any]) -> st
         f"{'Failed':<30} {qwen_summary.get('failed', 0):<25d} {glm_summary.get('failed', 0):<25d}"
     )
 
-    lines.append(
-        f"{'Avg Response Time (s)':<30} {qwen_avg_time:<25.2f} {glm_avg_time:<25.2f}"
-    )
+    lines.append(f"{'Avg Response Time (s)':<30} {qwen_avg_time:<25.2f} {glm_avg_time:<25.2f}")
     lines.append(
         f"{'Min Response Time (s)':<30} {qwen_summary.get('min_time', 0):<25.2f} {glm_summary.get('min_time', 0):<25.2f}"
     )
@@ -373,18 +367,14 @@ def format_comparison(qwen_data: dict[str, Any], glm_data: dict[str, Any]) -> st
                 f"\n✓ GLM-4.7-Flash is {abs(time_diff_pct):.1f}% faster (avg response time)"
             )
         else:
-            lines.append(
-                f"\n✓ Qwen3-Coder-Next is {time_diff_pct:.1f}% faster (avg response time)"
-            )
+            lines.append(f"\n✓ Qwen3-Coder-Next is {time_diff_pct:.1f}% faster (avg response time)")
 
     if glm_avg_tps > 0 and qwen_avg_tps > 0:
         tps_diff_pct = ((glm_avg_tps - qwen_avg_tps) / qwen_avg_tps) * 100
         if tps_diff_pct > 0:
             lines.append(f"✓ GLM-4.7-Flash is {tps_diff_pct:.1f}% faster (tokens/sec)")
         else:
-            lines.append(
-                f"✓ Qwen3-Coder-Next is {abs(tps_diff_pct):.1f}% faster (tokens/sec)"
-            )
+            lines.append(f"✓ Qwen3-Coder-Next is {abs(tps_diff_pct):.1f}% faster (tokens/sec)")
 
     lines.append("=" * 80)
 
@@ -393,9 +383,7 @@ def format_comparison(qwen_data: dict[str, Any], glm_data: dict[str, Any]) -> st
 
 def main():
     """Main benchmark function."""
-    parser = argparse.ArgumentParser(
-        description="Benchmark Qwen3-Coder-Next vs GLM-4.7-Flash"
-    )
+    parser = argparse.ArgumentParser(description="Benchmark Qwen3-Coder-Next vs GLM-4.7-Flash")
     parser.add_argument(
         "--output",
         default="benchmark-results.json",

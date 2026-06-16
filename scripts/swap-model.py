@@ -94,9 +94,7 @@ def get_current_model(verbose: bool = False) -> str | None:
     return None
 
 
-def wait_for_server(
-    timeout: int = 90, verbose: bool = False, progress_interval: int = 5
-) -> bool:
+def wait_for_server(timeout: int = 90, verbose: bool = False, progress_interval: int = 5) -> bool:
     """Wait for server to become ready with improved validation.
 
     Args:
@@ -173,11 +171,11 @@ def stop_server() -> bool:
 
 def start_server(model_key: str, wait_timeout: int = 90) -> bool:
     """Start llama-server with specified model.
-    
+
     Args:
         model_key: Model identifier (qwen or glm)
         wait_timeout: Maximum seconds to wait for server startup
-    
+
     Returns:
         True if server started and became healthy, False otherwise
     """
@@ -225,8 +223,12 @@ def start_server(model_key: str, wait_timeout: int = 90) -> bool:
         # Server didn't respond, check if process is still alive
         proc_info = check_process_running()
         if proc_info:
-            print(f"✗ Server process started but failed to become ready (timeout after {wait_timeout}s)")
-            print(f"  Try checking system resources or increasing timeout with: ./swap {model_key} --wait 120")
+            print(
+                f"✗ Server process started but failed to become ready (timeout after {wait_timeout}s)"
+            )
+            print(
+                f"  Try checking system resources or increasing timeout with: ./swap {model_key} --wait 120"
+            )
         else:
             print("✗ Server process exited unexpectedly")
             print(f"  Try running: llama-server -m {model_path}")
@@ -238,11 +240,11 @@ def start_server(model_key: str, wait_timeout: int = 90) -> bool:
 
 def swap_model(target_model: str, wait_timeout: int = 90) -> tuple[bool, str]:
     """Swap to a different model with minimal downtime.
-    
+
     Args:
         target_model: Target model identifier (qwen or glm)
         wait_timeout: Maximum seconds to wait for server startup
-    
+
     Returns:
         Tuple of (success: bool, message: str)
     """

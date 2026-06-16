@@ -155,13 +155,9 @@ def main():
     else:
         status_class = "offline"
         status_text = "Server Offline"
-        content = (
-            '<div class="card"><div class="error">Server is not responding</div></div>'
-        )
+        content = '<div class="card"><div class="error">Server is not responding</div></div>'
 
-    html = HTML_TEMPLATE.format(
-        status_class=status_class, status_text=status_text, content=content
-    )
+    html = HTML_TEMPLATE.format(status_class=status_class, status_text=status_text, content=content)
 
     class Handler(SimpleHTTPRequestHandler):
         def do_GET(self):

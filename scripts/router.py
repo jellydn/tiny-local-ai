@@ -263,9 +263,7 @@ def main() -> int:
         default="auto",
         help="Task type hint (auto-detects if not specified)",
     )
-    parser.add_argument(
-        "--max-tokens", type=int, default=512, help="Max tokens to generate"
-    )
+    parser.add_argument("--max-tokens", type=int, default=512, help="Max tokens to generate")
     parser.add_argument("--stream", action="store_true", help="Stream response")
     parser.add_argument(
         "--stats", action="store_true", help="Show router statistics after generation"
