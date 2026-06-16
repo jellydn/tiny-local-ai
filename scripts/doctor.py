@@ -1,66 +1,62 @@
 #!/usr/bin/env python3
-"""Hardware detection and model recommendation tool for Tiny Local AI."""
+"""Hardware detection and model recommendation for Tiny Local AI.
+
+Uses canirun.ai hardware database and model compatibility data.
+Data files in ../data/ can be updated via scripts/fetch-canirun-data.sh
+"""
 
 import json
-import os
 import platform
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+DATA_DIR = Path(__file__).parent.parent / "data"
 MODELS_CACHE = Path.home() / "Library/Caches/llama.cpp"
 
-AVAILABLE_MODELS = {
-    "Qwen3-Coder-Next": {
-        "name": "Qwen3-Coder-Next",
-        "file": "unsloth_Qwen3-Coder-Next-GGUF_UD-IQ1_S.gguf",
-        "size_gb": 20,
-        "params": "80B MoE",
-        "quantization": "IQ1_S (1-bit)",
-        "type": "coding",
-        "tok_per_sec_base": 25,
-        "use_cases": ["coding", "refactoring", "structured reasoning"],
-    },
-    "GLM-4.7-Flash": {
-        "name": "GLM-4.7-Flash",
-        "file": "unsloth_GLM-4.7-Flash-GGUF_UD-Q4_K_XL.gguf",
-        "size_gb": 16,
-        "params": "30B dense",
-        "quantization": "Q4_K_XL (4-bit)",
-        "type": "general",
-        "tok_per_sec_base": 41,
-        "use_cases": ["chat", "QA", "general tasks"],
-    },
-    "Qwen3-8B": {
-        "name": "Qwen3-8B",
-        "file": "Qwen3-8B-GGUF/Qwen3-8B-Q4_K_M.gguf",
-        "size_gb": 5,
-        "params": "8B dense",
-        "quantization": "Q4_K_M",
-        "type": "general",
-        "tok_per_sec_base": 55,
-        "use_cases": ["fast responses", "lightweight tasks"],
-    },
-    "DeepSeek-Coder-V2": {
-        "name": "DeepSeek-Coder-V2",
-        "file": "DeepSeek-Coder-V2-GGUF/DeepSeek-Coder-V2-Q4_K_M.gguf",
-        "size_gb": 8,
-        "params": "16B MoE",
-        "quantization": "Q4_K_M",
-        "type": "coding",
-        "tok_per_sec_base": 35,
-        "use_cases": ["code generation", "debugging"],
-    },
+# Quality ranking for quantization selection (higher = better)
+QUALITY_RANK = {
+    "low": 1,
+    "medium": 2,
+    "good": 3,
+    "very_good": 4,
+    "excellent": 5,
 }
 
 
-def get_mac_hardware() -> Dict[str, Any]:
-    """Detect Apple Silicon hardware details."""
+def _load_json(name: str) -> dict:
+    """Load a JSON data file from the data directory."""
+    path = DATA_DIR / name
+    if not path.exists():
+        print(f"  [WARN] Data file not found: {path}", file=sys.stderr)
+        return {}
+    with open(path) as f:
+        return json.load(f)
+
+
+def _load_hardware_db() -> tuple:
+    """Load hardware database. Returns (apple_silicon, nvidia_gpus)."""
+    hw = _load_json("hardware.json")
+    return hw.get("apple_silicon", {}), hw.get("nvidia_gpus", {})
+
+
+def _load_models_db() -> dict:
+    """Load model database."""
+    return _load_json("models.json")
+
+
+# ---------------------------------------------------------------------------
+# Hardware detection
+# ---------------------------------------------------------------------------
+
+def get_mac_hardware(apple_silicon: dict) -> Dict[str, Any]:
+    """Detect Apple Silicon hardware."""
     info = {
         "is_mac": False,
         "chip": "Unknown",
         "chip_family": "Unknown",
+        "variant": "base",
         "cpu_cores": 0,
         "gpu_cores": 0,
         "ram_gb": 0,
@@ -77,30 +73,55 @@ def get_mac_hardware() -> Dict[str, Any]:
     try:
         chip = subprocess.run(
             ["sysctl", "-n", "machdep.cpu.brand_string"],
-            capture_output=True,
-            text=True,
+            capture_output=True, text=True,
         ).stdout.strip()
         info["chip"] = chip if chip else "Apple Silicon"
 
         result = subprocess.run(
             ["sysctl", "-n", "hw.ncpu"],
-            capture_output=True,
-            text=True,
+            capture_output=True, text=True,
         )
         info["cpu_cores"] = int(result.stdout.strip()) if result.stdout else 0
 
         result = subprocess.run(
             ["sysctl", "-n", "hw.memsize"],
-            capture_output=True,
-            text=True,
+            capture_output=True, text=True,
         )
         ram_bytes = int(result.stdout.strip()) if result.stdout else 0
-        info["ram_gb"] = ram_bytes // (1024**3)
+        info["ram_gb"] = ram_bytes // (1024 ** 3)
 
+        # Detect chip family and variant — match longest prefix first
+        # to avoid "M1" matching before "M1 Pro" / "M1 Max" / "M1 Ultra"
+        matched_family = None
+        matched_variant = "base"
+        for family in sorted(apple_silicon.keys(), key=len, reverse=True):
+            if family in chip:
+                matched_family = family
+                remainder = chip.replace(family, "").strip()
+                if "Ultra" in remainder:
+                    matched_variant = "ultra"
+                elif "Max" in remainder:
+                    matched_variant = "max"
+                elif "Pro" in remainder:
+                    matched_variant = "pro"
+                else:
+                    matched_variant = "base"
+                break
+
+        if matched_family:
+            info["chip_family"] = matched_family
+            info["variant"] = matched_variant
+            family_data = apple_silicon[matched_family]
+            gpu_data = family_data.get("gpu_cores", 0)
+            if isinstance(gpu_data, dict):
+                info["gpu_cores"] = gpu_data.get(matched_variant, 0)
+            else:
+                info["gpu_cores"] = gpu_data
+
+        # Check Metal support
         result = subprocess.run(
             ["system_profiler", "SPDisplaysDataType"],
-            capture_output=True,
-            text=True,
+            capture_output=True, text=True,
         )
         if "Apple" in result.stdout:
             info["metal_available"] = True
@@ -108,23 +129,110 @@ def get_mac_hardware() -> Dict[str, Any]:
                 if "Metal" in line:
                     info["metal_device"] = line.split(":")[-1].strip()
                     break
-                if "Apple" in line:
+                if "Apple" in line and "M" in line:
                     info["metal_device"] = line.split(":")[-1].strip()
-
-        if "M1" in chip or "M2" in chip or "M3" in chip or "M4" in chip:
-            info["chip_family"] = chip.split()[0] if chip else "Apple Silicon"
-            if "Max" in chip:
-                info["gpu_cores"] = 24 if "M1" in chip else 28
-            elif "Pro" in chip:
-                info["gpu_cores"] = 14 if "M1" in chip else 18
-            elif "Ultra" in chip:
-                info["gpu_cores"] = 48
 
     except Exception as e:
         info["error"] = str(e)
 
-    info["ram_effective_gb"] = info["ram_gb"] - 4
+    info["ram_effective_gb"] = max(info["ram_gb"] - 4, 0)
     return info
+
+
+def get_nvidia_gpu(nvidia_gpus: dict) -> Optional[Dict[str, Any]]:
+    """Detect NVIDIA GPU on Linux/Windows."""
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            parts = result.stdout.strip().split(",")
+            name = parts[0].strip()
+            mem_str = parts[1].strip() if len(parts) > 1 else "0 MiB"
+            vram_mb = int(mem_str.replace("MiB", "").strip())
+            vram_gb = vram_mb // 1024
+
+            # Match against known GPUs — longest prefix first
+            gpu_info = None
+            for gpu_name in sorted(nvidia_gpus.keys(), key=len, reverse=True):
+                if gpu_name in name:
+                    gpu_info = {"name": gpu_name, **nvidia_gpus[gpu_name]}
+                    break
+
+            if not gpu_info:
+                gpu_info = {"name": name, "vram": vram_gb, "tier": "unknown"}
+
+            return {
+                "name": name,
+                "vram_gb": vram_gb,
+                "vram_mb": vram_mb,
+                **gpu_info,
+            }
+    except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+        pass
+    return None
+
+
+def detect_hardware() -> Dict[str, Any]:
+    """Full hardware detection: Apple Silicon + NVIDIA."""
+    apple_silicon, nvidia_gpus = _load_hardware_db()
+    mac = get_mac_hardware(apple_silicon)
+    nvidia = get_nvidia_gpu(nvidia_gpus)
+
+    return {
+        "mac": mac,
+        "nvidia": nvidia,
+        "platform": platform.system(),
+        "platform_release": platform.release(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Model recommendations
+# ---------------------------------------------------------------------------
+
+def estimate_tok_per_sec(hardware: Dict[str, Any], model_size_gb: float) -> int:
+    """Estimate tokens per second based on hardware and model size."""
+    mac = hardware.get("mac", {})
+    nvidia = hardware.get("nvidia")
+
+    if nvidia:
+        tier = nvidia.get("tier", "entry")
+        base_speeds = {
+            "enthusiast": 80, "high": 50, "mid": 30, "entry": 15, "unknown": 20,
+        }
+        base = base_speeds.get(tier, 20)
+        if model_size_gb > 40:
+            return max(int(base * 0.3), 2)
+        elif model_size_gb > 20:
+            return max(int(base * 0.5), 4)
+        elif model_size_gb > 10:
+            return max(int(base * 0.7), 8)
+        return base
+
+    if mac.get("is_mac"):
+        chip = mac.get("chip_family", "M1")
+        variant = mac.get("variant", "base")
+
+        gen_multiplier = {"M1": 1.0, "M2": 1.2, "M3": 1.4, "M4": 1.6, "M5": 1.8}
+        base_chip = chip.replace(" Pro", "").replace(" Max", "").replace(" Ultra", "")
+        base = 20 * gen_multiplier.get(base_chip, 1.0)
+
+        variant_mult = {"base": 0.8, "pro": 1.0, "max": 1.3, "ultra": 1.6}
+        base *= variant_mult.get(variant, 1.0)
+
+        if model_size_gb > 40:
+            return max(int(base * 0.15), 2)
+        elif model_size_gb > 20:
+            return max(int(base * 0.3), 4)
+        elif model_size_gb > 10:
+            return max(int(base * 0.6), 8)
+        elif model_size_gb > 5:
+            return max(int(base * 0.8), 12)
+        return max(int(base), 15)
+
+    return 5
 
 
 def get_llama_server_path() -> Optional[str]:
@@ -132,199 +240,200 @@ def get_llama_server_path() -> Optional[str]:
     paths = [
         "/opt/homebrew/bin/llama-server",
         "/usr/local/bin/llama-server",
-        Path.home() / ".local/bin/llama-server",
+        str(Path.home() / ".local/bin/llama-server"),
     ]
     for p in paths:
         if Path(p).exists():
             return p
-
     result = subprocess.run(["which", "llama-server"], capture_output=True, text=True)
     if result.returncode == 0:
         return result.stdout.strip()
     return None
 
 
-def check_cached_models() -> List[str]:
-    """Check which models are cached locally."""
+def check_cached_models(models_db: dict) -> List[str]:
+    """Check which models are cached locally. Single pass over directory."""
     cached = []
-    if MODELS_CACHE.exists():
-        for model_key, model_info in AVAILABLE_MODELS.items():
-            model_path = MODELS_CACHE / model_info["file"]
-            if model_path.exists():
+    if not MODELS_CACHE.exists():
+        return cached
+
+    # Single pass: collect all .gguf filenames
+    gguf_names = [f.name.lower() for f in MODELS_CACHE.rglob("*.gguf") if f.is_file()]
+
+    for model_key, model_info in models_db.items():
+        repo = model_info.get("repo", "")
+        org, model_name = repo.split("/") if "/" in repo else ("", repo)
+        pattern = f"{org}__{model_name}__".replace("__", "_")
+        model_slug = model_name.replace("-", "_").lower()
+
+        for name in gguf_names:
+            if pattern in name or model_slug in name:
                 cached.append(model_key)
-            else:
-                parent = model_path.parent
-                if parent.exists():
-                    for f in parent.iterdir():
-                        if f.is_file() and f.suffix == ".gguf":
-                            cached.append(model_key)
-                            break
+                break
+
     return cached
 
 
-def get_model_size_gb(file_path: Path) -> float:
-    """Get model file size in GB."""
-    if file_path.exists():
-        return file_path.stat().st_size / (1024**3)
-    return 0.0
+def recommend_models(hardware: Dict[str, Any], models_db: dict) -> List[Dict[str, Any]]:
+    """Recommend models using canirun.ai compatibility logic.
 
+    Selects the best quality quantization that fits in available memory,
+    not the smallest one.
+    """
+    mac = hardware.get("mac", {})
+    nvidia = hardware.get("nvidia")
 
-def recommend_models(
-    hardware: Dict[str, Any], cached: List[str]
-) -> List[Dict[str, Any]]:
-    """Recommend models based on detected hardware."""
+    if mac.get("is_mac"):
+        available_gb = mac.get("ram_effective_gb", 0)
+    elif nvidia:
+        available_gb = nvidia.get("vram_gb", 0)
+    else:
+        available_gb = 0
+
     recommendations = []
-    ram = hardware.get("ram_effective_gb", hardware.get("ram_gb", 0))
 
-    for model_key, model_info in AVAILABLE_MODELS.items():
-        model_path = MODELS_CACHE / model_info["file"]
-        size_gb = (
-            get_model_size_gb(model_path)
-            if model_path.exists()
-            else model_info["size_gb"]
-        )
+    for model_key, model_info in models_db.items():
+        # Find the best quality quantization that fits
+        best_quant = None
+        best_quality_rank = -1
+        best_size = 0.0
 
-        if size_gb > ram * 0.8:
+        for quant_name, quant_info in model_info.get("quants", {}).items():
+            size = quant_info["size_gb"]
+            # Need 1.2x model size for context + overhead
+            if size * 1.2 > available_gb:
+                continue
+            q_rank = QUALITY_RANK.get(quant_info.get("quality", "low"), 0)
+            if q_rank > best_quality_rank or (q_rank == best_quality_rank and size < best_size):
+                best_quant = quant_name
+                best_quality_rank = q_rank
+                best_size = size
+
+        if not best_quant:
             continue
 
-        estimated_tok_sec = model_info["tok_per_sec_base"]
-        if hardware.get("chip_family"):
-            if "M1" in hardware["chip_family"]:
-                estimated_tok_sec = int(model_info["tok_per_sec_base"] * 0.9)
-            elif "M2" in hardware["chip_family"]:
-                estimated_tok_sec = int(model_info["tok_per_sec_base"] * 1.0)
-            elif "M3" in hardware["chip_family"] or "M4" in hardware["chip_family"]:
-                estimated_tok_sec = int(model_info["tok_per_sec_base"] * 1.1)
+        quant_info = model_info["quants"][best_quant]
+        size_gb = quant_info["size_gb"]
+        tok_sec = estimate_tok_per_sec(hardware, size_gb)
 
-        is_cached = model_key in cached
-        score = 100
-        if is_cached:
-            score += 20
-        if model_info["type"] == "coding":
+        score = tok_sec
+        if quant_info["bits"] >= 4:
             score += 10
+        if model_info["type"] == "coding":
+            score += 5
 
-        recommendations.append(
-            {
-                "name": model_info["name"],
-                "size_gb": round(size_gb, 1),
-                "params": model_info["params"],
-                "quantization": model_info["quantization"],
-                "type": model_info["type"],
-                "estimated_tok_sec": estimated_tok_sec,
-                "use_cases": model_info["use_cases"],
-                "cached": is_cached,
-                "score": score,
-                "file": model_info["file"],
-            }
-        )
+        recommendations.append({
+            "name": model_info["name"],
+            "params": model_info.get("params", ""),
+            "type": model_info["type"],
+            "quantization": best_quant,
+            "size_gb": size_gb,
+            "quality": quant_info["quality"],
+            "estimated_tok_sec": tok_sec,
+            "use_cases": model_info["use_cases"],
+            "repo": model_info["repo"],
+            "score": score,
+        })
 
     return sorted(recommendations, key=lambda x: x["score"], reverse=True)
 
 
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+
 def print_header(title: str) -> None:
-    """Print a section header."""
     print(f"\n{'=' * 60}")
     print(f"  {title}")
     print(f"{'=' * 60}")
 
 
-def printHardwareInfo(hardware: Dict[str, Any]) -> None:
-    """Print detected hardware information."""
+def print_hardware_info(hardware: Dict[str, Any]) -> None:
     print_header("DETECTED HARDWARE")
 
-    if not hardware.get("is_mac"):
-        print("  ⚠️  Not running on Apple Silicon")
-        print(f"  Platform: {platform.system()} {platform.release()}")
-        return
+    mac = hardware.get("mac", {})
+    nvidia = hardware.get("nvidia")
 
-    print(f"  Chip:                 {hardware.get('chip', 'Unknown')}")
-    print(f"  CPU Cores:            {hardware.get('cpu_cores', 'N/A')}")
-    print(f"  GPU Cores:            {hardware.get('gpu_cores', 'N/A')}")
-    print(f"  RAM:                  {hardware.get('ram_gb', 0)} GB")
-    print(f"  RAM Available:        {hardware.get('ram_effective_gb', 0)} GB")
-    print(
-        f"  Metal Support:        {'✅ Yes' if hardware.get('metal_available') else '❌ No'}"
-    )
-    if hardware.get("metal_device"):
-        print(f"  Metal Device:         {hardware['metal_device']}")
+    if mac.get("is_mac"):
+        print(f"  Chip:                 {mac.get('chip', 'Unknown')}")
+        print(f"  Variant:              {mac.get('variant', 'N/A')}")
+        print(f"  CPU Cores:            {mac.get('cpu_cores', 'N/A')}")
+        print(f"  GPU Cores:            {mac.get('gpu_cores', 'N/A')}")
+        print(f"  RAM:                  {mac.get('ram_gb', 0)} GB")
+        print(f"  RAM Available:        {mac.get('ram_effective_gb', 0)} GB")
+        print(f"  Metal Support:        {'Yes' if mac.get('metal_available') else 'No'}")
+        if mac.get("metal_device") and mac["metal_device"] != "None":
+            print(f"  Metal Device:         {mac['metal_device']}")
+    elif nvidia:
+        print(f"  GPU:                  {nvidia.get('name', 'Unknown')}")
+        print(f"  VRAM:                 {nvidia.get('vram_gb', 0)} GB")
+        print(f"  Tier:                 {nvidia.get('tier', 'Unknown')}")
+    else:
+        print(f"  Platform:             {hardware.get('platform', 'Unknown')}")
+        print("  Note:                 Apple Silicon or NVIDIA GPU required for local inference")
 
 
-def printModelRecommendations(recommendations: List[Dict[str, Any]]) -> None:
-    """Print model recommendations."""
-    print_header("RECOMMENDED MODELS")
+def print_recommendations(recommendations: List[Dict[str, Any]], cached: List[str]) -> None:
+    print_header("RECOMMENDED MODELS (via canirun.ai)")
 
     if not recommendations:
-        print("  ❌ No models fit in available memory")
+        print("  No models fit in available memory.")
+        print("  Visit https://www.canirun.ai/ for more options.")
         return
 
-    print("  Ranked by performance + fit:\n")
+    print(f"  {'#':<4} {'Model':<25} {'Size':<8} {'Quant':<12} {'tok/s':<8} {'Type':<12}")
+    print(f"  {'-'*4} {'-'*25} {'-'*8} {'-'*12} {'-'*8} {'-'*12}")
 
-    for i, model in enumerate(recommendations, 1):
-        cached_status = "✅ CACHED" if model["cached"] else "❌ NOT CACHED"
-        print(f"  {i}. {model['name']}")
-        print(f"     Size: {model['size_gb']}GB | Params: {model['params']}")
-        print(f"     Quantization: {model['quantization']}")
-        print(f"     Estimated: ~{model['estimated_tok_sec']} tok/sec")
-        print(f"     Best for: {', '.join(model['use_cases'])}")
-        print(f"     Status: {cached_status}")
-        print()
+    for i, model in enumerate(recommendations[:8], 1):
+        cached_mark = " [cached]" if model["name"].replace(" ", "-").replace(".", "-") in [
+            c.replace(" ", "-") for c in cached
+        ] else ""
+        print(
+            f"  {i:<4} {model['name']:<25} {model['size_gb']:<8.1f} "
+            f"{model['quantization']:<12} {model['estimated_tok_sec']:<8} "
+            f"{model['type']:<12}{cached_mark}"
+        )
 
-
-def printCachedModels(cached: List[str]) -> None:
-    """Print cached models."""
-    print_header("CACHED MODELS")
-
-    if not cached:
-        print("  ❌ No models cached")
-        print("  Run ./scripts/download-model.sh to download models")
-        return
-
-    print("  Available models:")
-    for model_key in cached:
-        model_info = AVAILABLE_MODELS.get(model_key, {})
-        size = get_model_size_gb(MODELS_CACHE / model_info.get("file", ""))
-        print(f"  • {model_key} ({size:.1f} GB)")
+    print("\n  Data source: https://www.canirun.ai/")
+    print("  Model source: https://unsloth.ai/")
 
 
-def printSystemCheck() -> None:
-    """Print system health check."""
+def print_system_check(cached: List[str]) -> None:
     print_header("SYSTEM CHECK")
 
     llama_path = get_llama_server_path()
     if llama_path:
-        print(f"  ✅ llama-server: {llama_path}")
+        print(f"  [OK] llama-server: {llama_path}")
     else:
-        print("  ❌ llama-server not found")
-        print("  Install with: brew install llama.cpp")
+        print("  [MISSING] llama-server not found")
+        print("           Install: brew install llama.cpp")
 
-    cache_path = MODELS_CACHE
-    if cache_path.exists():
-        print(f"  ✅ Model cache: {cache_path}")
+    if MODELS_CACHE.exists():
+        print(f"  [OK] Model cache: {MODELS_CACHE}")
     else:
-        print(f"  ⚠️  Model cache not found: {cache_path}")
+        print(f"  [WARN] Model cache not found: {MODELS_CACHE}")
 
-    model_count = len(check_cached_models())
-    print(f"  📦 Cached models: {model_count}")
+    print(f"  [INFO] Cached models: {len(cached)}")
 
 
 def main() -> int:
-    """Main entry point."""
     print("\n" + "=" * 60)
-    print("  🔍 Tiny Local AI - Hardware Doctor")
+    print("  Tiny Local AI - Hardware Doctor")
+    print("  Powered by canirun.ai")
     print("=" * 60)
 
-    hardware = get_mac_hardware()
-    cached = check_cached_models()
-    recommendations = recommend_models(hardware, cached)
+    models_db = _load_models_db()
+    hardware = detect_hardware()
+    cached = check_cached_models(models_db)
+    recommendations = recommend_models(hardware, models_db)
 
-    printHardwareInfo(hardware)
-    printCachedModels(cached)
-    printModelRecommendations(recommendations)
-    printSystemCheck()
+    print_hardware_info(hardware)
+    print_recommendations(recommendations, cached)
+    print_system_check(cached)
 
-    print("\n" + "=" * 60)
-    print("  ✅ Diagnostics complete")
-    print("=" * 60 + "\n")
+    print(f"\n{'=' * 60}")
+    print("  Diagnostics complete")
+    print(f"{'=' * 60}\n")
 
     return 0
 

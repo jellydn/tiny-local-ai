@@ -7,12 +7,13 @@
 
 ## Features
 
-- 🚀 **Metal Acceleration** - GPU-offloaded inference on Apple Silicon
-- 🌐 **LAN Access** - OpenAI-compatible API accessible from other machines
-- 🖥️ **Dual-Mac Setup** - Server on MacBook A, client on MacBook B
-- 📊 **Web Dashboard** - Monitor server status
-- 🔧 **Auto Hardware Detection** - Automatically optimizes context size based on RAM
-- 📦 **Model Agnostic** - Supports any GGUF model (Qwen3-Coder-Next, MiniMax-M2.5, etc.)
+- **Metal / CUDA Acceleration** - GPU-offloaded inference on Apple Silicon and NVIDIA
+- **LAN Access** - OpenAI-compatible API accessible from other machines
+- **Dual-Mac Setup** - Server on MacBook A, client on MacBook B
+- **Web Dashboard** - Monitor server status
+- **Auto Hardware Detection** - Powered by [canirun.ai](https://www.canirun.ai/) - supports Apple Silicon M1-M5 and NVIDIA RTX/GTX
+- **Model Recommendations** - Dynamic model suggestions based on your hardware
+- **Model Agnostic** - Supports any GGUF model
 
 ## Prerequisites
 
@@ -56,14 +57,23 @@ Get GGUF models from HuggingFace (Recommended):
 
 **Recommended Models by Hardware:**
 
-| Hardware          | Tier           | Model Size | Quant          | Context | Speed        |
-| ----------------- | -------------- | ---------- | -------------- | ------- | ------------ |
-| M1/M2/M3 Max 32GB | Best Quality   | 32B        | Q4_K_M         | 8K-16K  | 8-12 tok/sec |
-| M1/M2/M3 Max 32GB | Extended CTX   | 14B        | Q4_K_M/Q5_K_M  | 16K-32K | 15-25 tok/s  |
-| M1/M2/M3 Max 32GB | Advanced (NEW) | 80B        | UD-IQ1_S/TQ1_0 | 4K-8K   | 2-4 tok/sec  |
-| M1/M2 Pro 16GB    | Best Balance   | 14B        | Q4_K_M         | 8K      | 12-20 tok/s  |
-| M1/M2 Pro 16GB    | Larger Context | 14B        | Q4_K_S         | 16K     | 10-15 tok/s  |
-| M1/M2 8GB         | Best Option    | 7B         | Q4_K_S         | 8K      | 15-25 tok/s  |
+For the most up-to-date recommendations, run the hardware doctor:
+
+```bash
+python3 scripts/doctor.py
+```
+
+Or visit [canirun.ai](https://www.canirun.ai/) directly.
+
+| Hardware           | Model                    | Quant        | Size   | Speed       |
+| ------------------ | ------------------------ | ------------ | ------ | ----------- |
+| M3/M4 Max 36-128GB | MiniMax-M2.5             | Q4_K_M       | ~120G  | 5-10 tok/s  |
+| M2/M3 Max 32GB     | Qwen3-Coder-Next         | UD-IQ1_S     | ~21.5G | 4-8 tok/s   |
+| M2/M3 Max 32GB     | GLM-4.7-Flash            | Q4_K_M       | ~18G   | 15-25 tok/s |
+| M1/M2 Pro 16GB     | Qwen3-8B                 | Q4_K_M       | ~5G    | 15-25 tok/s |
+| M1/M2/M3/M4 8-16GB | Gemma-3-4B               | Q4_K_M       | ~2.7G  | 20-35 tok/s |
+| RTX 4090 (24GB)    | Qwen3-Coder-Next         | Q4_K_M       | ~48G   | 15-25 tok/s |
+| RTX 4080 (16GB)    | GLM-4.7-Flash            | Q4_K_M       | ~18G   | 20-35 tok/s |
 
 **New Discovery: 80B Models Now Viable! 🎉**
 
@@ -137,25 +147,26 @@ python scripts/llm-client.py -s "Tell me a story"
 
 ## Scripts
 
-| Script                   | Description                                   |
-| ------------------------ | --------------------------------------------- |
-| `download-model.sh`      | Download GGUF models from HuggingFace         |
-| `start-llm.sh`           | Start LLM server with auto hardware detection |
-| `start-llm-router.sh`    | Auto-detect and start with optimal model      |
-| `start-llm-optimized.sh` | Start with optimized parameters by model      |
-| `stop-llm.sh`            | Stop the LLM server                           |
-| `list-models.sh`         | List available cached models with sizes       |
-| `benchmark-startup.sh`   | Measure model startup times across iterations |
-| `llm-client.py`          | CLI client for interacting with the server    |
-| `serve-dashboard.py`     | Web dashboard to monitor server status        |
-| `doctor.py`              | Hardware detection & model recommendations    |
-| `router.py`              | Smart routing CLI with task-type detection    |
-| `swap-completion.bash`   | Bash shell completion for swap command        |
-| `swap-completion.zsh`    | Zsh shell completion for swap command         |
+| Script                   | Description                                           |
+| ------------------------ | ----------------------------------------------------- |
+| `fetch-canirun-data.sh`  | Fetch latest hardware/model data from canirun.ai      |
+| `download-model.sh`      | Download GGUF models from HuggingFace                 |
+| `start-llm.sh`           | Start LLM server with auto hardware detection         |
+| `start-llm-router.sh`    | Auto-detect and start with optimal model              |
+| `start-llm-optimized.sh` | Start with optimized parameters by model              |
+| `stop-llm.sh`            | Stop the LLM server                                   |
+| `list-models.sh`         | List available cached models with sizes               |
+| `benchmark-startup.sh`   | Measure model startup times across iterations         |
+| `llm-client.py`          | CLI client for interacting with the server            |
+| `serve-dashboard.py`     | Web dashboard to monitor server status                |
+| `doctor.py`              | Hardware detection & model recommendations (canirun.ai) |
+| `router.py`              | Smart routing CLI with task-type detection            |
+| `swap-completion.bash`   | Bash shell completion for swap command                |
+| `swap-completion.zsh`    | Zsh shell completion for swap command                 |
 
 ## Hardware Doctor
 
-Auto-detect hardware and get model recommendations:
+Powered by [canirun.ai](https://www.canirun.ai/) hardware database. Auto-detects Apple Silicon (M1-M5) and NVIDIA GPUs (RTX 50/40/30, GTX), then recommends optimal models and quantizations.
 
 ```bash
 python3 scripts/doctor.py
@@ -165,32 +176,39 @@ Output:
 
 ```
 ============================================================
-  🔍 Tiny Local AI - Hardware Doctor
+  Tiny Local AI - Hardware Doctor
+  Powered by canirun.ai
 ============================================================
 
 ============================================================
   DETECTED HARDWARE
 ============================================================
   Chip:                 Apple M1 Max
+  Variant:              max
   CPU Cores:            10
   GPU Cores:            24
   RAM:                  32 GB
   RAM Available:        28 GB
-  Metal Support:        ✅ Yes
+  Metal Support:        Yes
 
 ============================================================
-  RECOMMENDED MODELS
+  RECOMMENDED MODELS (via canirun.ai)
 ============================================================
-  1. Qwen3-Coder-Next (20.0GB)
-     Estimated: ~25 tok/sec | Best for: coding
-  2. GLM-4.7-Flash (16.3GB)
-     Estimated: ~41 tok/sec | Best for: chat, QA
+  #    Model                     Size     Quant        tok/s   Type
+  ---- ------------------------- -------- ------------ ------- ------------
+  1    GLM-4.7-Flash             16.3     UD-Q4_K_XL  41      general
+  2    DeepSeek-Coder-V2         8.0      Q4_K_M      35      coding
+  3    Qwen3-8B                  5.0      Q4_K_M      25      general
+
+  Data source: https://www.canirun.ai/
+  Model source: https://unsloth.ai/
 
 ============================================================
   SYSTEM CHECK
 ============================================================
-  ✅ llama-server installed
-  ✅ Model cache configured
+  [OK] llama-server: /opt/homebrew/bin/llama-server
+  [OK] Model cache: ~/Library/Caches/llama.cpp
+  [INFO] Cached models: 2
 ```
 
 ## Smart Router
@@ -595,6 +613,7 @@ Expected performance on M1 Max 32GB:
 
 ## Related
 
+- [canirun.ai](https://www.canirun.ai/) - Hardware detection and model compatibility data
 - [my-ai-tools](https://github.com/jellydn/my-ai-tools) - My complete AI setup
 - [ai-launcher](https://github.com/jellydn/ai-launcher) - CLI tool to switch between AI assistants
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) - GGML-based LLM inference
