@@ -57,7 +57,7 @@ for file in compatibility.ts models.ts gguf-sizes.json; do
     else
         echo "  ✗ $file (missing or empty)"
         failed=$((failed + 1))
-    done
+    fi
 done
 
 # Note: TypeScript-to-JSON conversion is not yet implemented.
