@@ -58,16 +58,15 @@
       "Q8_0": {"size_gb": 8.5, "quality": "excellent", "bits": 8}
     },
     "use_cases": ["reasoning", "math", "complex analysis"]
-  },
-  "Llama-3.1-8B": {
-    "name": "Llama 3.1 8B",
-    "repo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+  },  "Llama-3.3-8B": {
+    "name": "Llama 3.3 8B",
+    "repo": "mradermacher/Llama-3.3-8B-Instruct-GGUF",
     "params": "8B dense",
     "type": "general",
     "quants": {
-      "Q4_K_M": {"size_gb": 4.9, "quality": "good", "bits": 4},
-      "Q5_K_M": {"size_gb": 5.7, "quality": "very_good", "bits": 5},
-      "Q8_0": {"size_gb": 8.5, "quality": "excellent", "bits": 8}
+      "Q4_K_M": { "size_gb": 4.9, "quality": "good", "bits": 4 },
+      "Q5_K_M": { "size_gb": 5.7, "quality": "very_good", "bits": 5 },
+      "Q6_K": { "size_gb": 6.1, "quality": "very_good", "bits": 6 }
     },
     "use_cases": ["general", "chat", "fast inference"]
   },
