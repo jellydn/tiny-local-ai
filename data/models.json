@@ -104,5 +104,17 @@
       "Q6_K": {"size_gb": 331.4, "quality": "very_good", "bits": 6}
     },
     "use_cases": ["chat", "reasoning", "general"]
+  },
+  "DeepSeek-R1-Distill-Qwen-7B": {
+    "name": "DeepSeek R1 Distill Qwen 7B",
+    "repo": "unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF",
+    "params": "7B dense (DeepSeek-R1 distilled)",
+    "type": "reasoning",
+    "quants": {
+      "Q4_K_M": {"size_gb": 4.7, "quality": "good", "bits": 4},
+      "Q5_K_M": {"size_gb": 5.4, "quality": "very_good", "bits": 5},
+      "Q8_0": {"size_gb": 8.1, "quality": "excellent", "bits": 8}
+    },
+    "use_cases": ["reasoning", "math", "analysis"]
   }
 }
