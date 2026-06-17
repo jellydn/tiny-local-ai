@@ -173,6 +173,7 @@ def get_nvidia_gpu(nvidia_gpus: dict) -> dict[str, Any] | None:
             if not gpu_info:
                 gpu_info = {"name": name, "vram": vram_gb, "tier": "unknown"}
 
+            # Picks first GPU; multi-GPU enumeration is out of scope
             return {
                 "name": name,
                 "vram_gb": vram_gb,

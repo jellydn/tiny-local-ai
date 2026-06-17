@@ -1,11 +1,12 @@
 #!/bin/bash
-# Fetch latest hardware and model data from canirun.ai
-# Usage: ./scripts/fetch-canirun-data.sh
-# Output: ../data/hardware.json and ../data/models.json
+# Fetch latest hardware and model data from canirun.ai (validator only)
+# Usage: ./scripts/fetch-canirun-data.sh (validator — does NOT overwrite data/*.json)
 #
 # Note: canirun.ai's data is in TypeScript packages. This script fetches
-# the raw data files and converts them to JSON for doctor.py to consume.
-# If the upstream format changes, this script needs updating.
+# the raw files for offline inspection and validates the upstream is reachable.
+# It does NOT regenerate data/*.json — those are committed snapshots consumed
+# by scripts/doctor.py. If the upstream format changes, this script and the
+# committed snapshots both need updating.
 
 set -euo pipefail
 
