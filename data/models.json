@@ -91,5 +91,18 @@
       "Q8_0": {"size_gb": 4.5, "quality": "excellent", "bits": 8}
     },
     "use_cases": ["fast responses", "low memory", "lightweight"]
+  },
+  "Llama-4-Maverick": {
+    "name": "Llama 4 Maverick 17Bx128E Instruct",
+    "repo": "unsloth/Llama-4-Maverick-17B-128E-Instruct-GGUF",
+    "params": "17Bx128E MoE (~17B active)",
+    "type": "general",
+    "quants": {
+      "Q2_K": {"size_gb": 148.5, "quality": "low", "bits": 2},
+      "Q3_K_M": {"size_gb": 197.8, "quality": "medium", "bits": 3},
+      "Q4_K_M": {"size_gb": 247.0, "quality": "good", "bits": 4},
+      "Q6_K": {"size_gb": 331.4, "quality": "very_good", "bits": 6}
+    },
+    "use_cases": ["chat", "reasoning", "general"]
   }
 }
