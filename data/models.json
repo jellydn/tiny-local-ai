@@ -116,5 +116,18 @@
       "Q8_0": {"size_gb": 8.1, "quality": "excellent", "bits": 8}
     },
     "use_cases": ["reasoning", "math", "analysis"]
+  },
+  "Mistral-Nemo-12B": {
+    "name": "Mistral Nemo 12B",
+    "repo": "unsloth/Mistral-Nemo-Instruct-2407-GGUF",
+    "params": "12B dense (Mistral + NVIDIA collaboration)",
+    "type": "general",
+    "quants": {
+      "Q3_K_M": {"size_gb": 6.1, "quality": "medium", "bits": 3},
+      "Q4_K_M": {"size_gb": 7.5, "quality": "good", "bits": 4},
+      "Q5_K_M": {"size_gb": 8.7, "quality": "very_good", "bits": 5},
+      "Q6_K": {"size_gb": 10.1, "quality": "very_good", "bits": 6}
+    },
+    "use_cases": ["chat", "general", "multilingual"]
   }
 }
