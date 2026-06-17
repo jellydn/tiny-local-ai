@@ -129,5 +129,17 @@
       "Q6_K": {"size_gb": 10.1, "quality": "very_good", "bits": 6}
     },
     "use_cases": ["chat", "general", "multilingual"]
+  },
+  "Qwen2.5-Coder-7B": {
+    "name": "Qwen2.5 Coder 7B",
+    "repo": "unsloth/Qwen2.5-Coder-7B-Instruct-GGUF",
+    "params": "7B dense",
+    "type": "coding",
+    "quants": {
+      "Q3_K_M": {"size_gb": 3.8, "quality": "medium", "bits": 3},
+      "Q4_K_M": {"size_gb": 4.7, "quality": "good", "bits": 4},
+      "Q5_K_M": {"size_gb": 5.4, "quality": "very_good", "bits": 5}
+    },
+    "use_cases": ["code generation", "debugging", "refactoring"]
   }
 }
