@@ -153,5 +153,18 @@
       "Q5_K_M": {"size_gb": 10.5, "quality": "very_good", "bits": 5}
     },
     "use_cases": ["code generation", "debugging", "refactoring"]
+  },
+  "Qwen3-14B": {
+    "name": "Qwen3 14B",
+    "repo": "unsloth/Qwen3-14B-GGUF",
+    "params": "14B dense",
+    "type": "general",
+    "quants": {
+      "UD-Q4_K_XL": {"size_gb": 9.2, "quality": "good", "bits": 4},
+      "Q4_K_M": {"size_gb": 9.0, "quality": "good", "bits": 4},
+      "Q5_K_M": {"size_gb": 10.5, "quality": "very_good", "bits": 5},
+      "Q8_0": {"size_gb": 15.7, "quality": "excellent", "bits": 8}
+    },
+    "use_cases": ["chat", "general", "reasoning"]
   }
 }
