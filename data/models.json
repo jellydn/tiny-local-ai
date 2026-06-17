@@ -141,5 +141,17 @@
       "Q5_K_M": {"size_gb": 5.4, "quality": "very_good", "bits": 5}
     },
     "use_cases": ["code generation", "debugging", "refactoring"]
+  },
+  "Qwen2.5-Coder-14B": {
+    "name": "Qwen2.5 Coder 14B",
+    "repo": "unsloth/Qwen2.5-Coder-14B-Instruct-GGUF",
+    "params": "14B dense",
+    "type": "coding",
+    "quants": {
+      "Q3_K_M": {"size_gb": 7.3, "quality": "medium", "bits": 3},
+      "Q4_K_M": {"size_gb": 9.0, "quality": "good", "bits": 4},
+      "Q5_K_M": {"size_gb": 10.5, "quality": "very_good", "bits": 5}
+    },
+    "use_cases": ["code generation", "debugging", "refactoring"]
   }
 }
