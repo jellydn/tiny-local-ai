@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Run local LLM on MacBook A, access from MacBook B over LAN"
 requires-python = ">=3.10"
 dependencies = [
+    "gradio-client>=2.5.0",
     "openai>=2.41.1",
 ]
 
