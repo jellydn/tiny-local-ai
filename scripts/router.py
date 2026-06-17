@@ -2,15 +2,12 @@
 """Smart router for Tiny Local AI - Routes prompts to optimal model."""
 
 import argparse
-import json
 import re
 import sys
 import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from openai import OpenAI
-
 
 CODING_KEYWORDS = [
     "code",
@@ -130,7 +127,7 @@ class Router:
 
         return "general"
 
-    def route_model(self, task_type: str, prefer: Optional[str] = None) -> str:
+    def route_model(self, task_type: str, prefer: str | None = None) -> str:
         """Route to optimal model based on task type."""
         if prefer:
             return prefer
@@ -139,7 +136,7 @@ class Router:
             return "qwen"
         return "glm"
 
-    def get_model_config(self, model: str) -> Dict[str, Any]:
+    def get_model_config(self, model: str) -> dict[str, Any]:
         """Get model-specific configuration."""
         configs = {
             "qwen": {
@@ -161,11 +158,11 @@ class Router:
     def generate(
         self,
         prompt: str,
-        task_type: Optional[str] = None,
-        prefer: Optional[str] = None,
+        task_type: str | None = None,
+        prefer: str | None = None,
         stream: bool = False,
         max_tokens: int = 512,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate response with smart routing."""
         start_time = time.time()
 
@@ -266,9 +263,7 @@ def main() -> int:
         default="auto",
         help="Task type hint (auto-detects if not specified)",
     )
-    parser.add_argument(
-        "--max-tokens", type=int, default=512, help="Max tokens to generate"
-    )
+    parser.add_argument("--max-tokens", type=int, default=512, help="Max tokens to generate")
     parser.add_argument("--stream", action="store_true", help="Stream response")
     parser.add_argument(
         "--stats", action="store_true", help="Show router statistics after generation"

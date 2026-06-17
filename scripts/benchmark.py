@@ -3,15 +3,13 @@
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from openai import OpenAI
-
 
 # Configuration
 MODELS_CACHE = Path.home() / "Library/Caches/llama.cpp"
@@ -32,7 +30,7 @@ MODELS = {
 }
 
 
-def load_prompts() -> List[Dict[str, Any]]:
+def load_prompts() -> list[dict[str, Any]]:
     """Load test prompts from JSON file."""
     if not BENCHMARK_PROMPTS.exists():
         print(f"Error: {BENCHMARK_PROMPTS} not found", file=sys.stderr)
@@ -43,7 +41,7 @@ def load_prompts() -> List[Dict[str, Any]]:
     return data.get("prompts", [])
 
 
-def start_server(model_key: str, dry_run: bool = False) -> Optional[subprocess.Popen]:
+def start_server(model_key: str, dry_run: bool = False) -> subprocess.Popen | None:
     """Start llama-server with the specified model."""
     model_info = MODELS[model_key]
     model_path = model_info["path"]
@@ -89,7 +87,6 @@ def start_server(model_key: str, dry_run: bool = False) -> Optional[subprocess.P
 
 def wait_for_server(port: int, timeout: int = 60) -> bool:
     """Wait for server to be ready on the specified port."""
-    url = f"http://localhost:{port}/health"
     start = time.time()
 
     while time.time() - start < timeout:
@@ -103,7 +100,7 @@ def wait_for_server(port: int, timeout: int = 60) -> bool:
     return False
 
 
-def stop_server(process: Optional[subprocess.Popen]) -> None:
+def stop_server(process: subprocess.Popen | None) -> None:
     """Stop the llama-server process."""
     if process is None:
         return
@@ -122,7 +119,7 @@ def measure_prompt(
     prompt: str,
     timeout: int = 300,
     max_tokens: int = 512,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run a single prompt and measure latency metrics.
 
     Args:
@@ -135,7 +132,6 @@ def measure_prompt(
     start_time = time.time()
     ttft = None
     token_count = 0
-    first_token_time = None
 
     try:
         response = client.chat.completions.create(
@@ -174,12 +170,12 @@ def measure_prompt(
 
 def run_benchmark_for_model(
     model_key: str,
-    prompts: List[Dict[str, Any]],
-    categories: Optional[List[str]] = None,
+    prompts: list[dict[str, Any]],
+    categories: list[str] | None = None,
     dry_run: bool = False,
     timeout: int = 300,
     max_tokens: int = 512,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run benchmark for a single model.
 
     Args:
@@ -215,9 +211,7 @@ def run_benchmark_for_model(
         stop_server(server_process)
         sys.exit(1)
 
-    client = OpenAI(
-        base_url=f"http://localhost:{model_info['port']}/v1", api_key="sk-no-key"
-    )
+    client = OpenAI(base_url=f"http://localhost:{model_info['port']}/v1", api_key="sk-no-key")
 
     results = []
     for i, prompt_data in enumerate(filtered_prompts, 1):
@@ -246,7 +240,7 @@ def run_benchmark_for_model(
         )
 
     stop_server(server_process)
-    print(f"\nStopping server... ✓")
+    print("\nStopping server... ✓")
 
     summary = compute_summary(results)
 
@@ -258,7 +252,7 @@ def run_benchmark_for_model(
     }
 
 
-def compute_summary(results: list[dict[str, Any]]) -> Dict[str, Any]:
+def compute_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
     """Compute summary statistics for benchmark results."""
     successful = [r for r in results if r.get("status") == "success"]
 
@@ -344,9 +338,7 @@ def format_comparison(qwen_data: dict[str, Any], glm_data: dict[str, Any]) -> st
         f"{'Failed':<30} {qwen_summary.get('failed', 0):<25d} {glm_summary.get('failed', 0):<25d}"
     )
 
-    lines.append(
-        f"{'Avg Response Time (s)':<30} {qwen_avg_time:<25.2f} {glm_avg_time:<25.2f}"
-    )
+    lines.append(f"{'Avg Response Time (s)':<30} {qwen_avg_time:<25.2f} {glm_avg_time:<25.2f}")
     lines.append(
         f"{'Min Response Time (s)':<30} {qwen_summary.get('min_time', 0):<25.2f} {glm_summary.get('min_time', 0):<25.2f}"
     )
@@ -375,18 +367,14 @@ def format_comparison(qwen_data: dict[str, Any], glm_data: dict[str, Any]) -> st
                 f"\n✓ GLM-4.7-Flash is {abs(time_diff_pct):.1f}% faster (avg response time)"
             )
         else:
-            lines.append(
-                f"\n✓ Qwen3-Coder-Next is {time_diff_pct:.1f}% faster (avg response time)"
-            )
+            lines.append(f"\n✓ Qwen3-Coder-Next is {time_diff_pct:.1f}% faster (avg response time)")
 
     if glm_avg_tps > 0 and qwen_avg_tps > 0:
         tps_diff_pct = ((glm_avg_tps - qwen_avg_tps) / qwen_avg_tps) * 100
         if tps_diff_pct > 0:
             lines.append(f"✓ GLM-4.7-Flash is {tps_diff_pct:.1f}% faster (tokens/sec)")
         else:
-            lines.append(
-                f"✓ Qwen3-Coder-Next is {abs(tps_diff_pct):.1f}% faster (tokens/sec)"
-            )
+            lines.append(f"✓ Qwen3-Coder-Next is {abs(tps_diff_pct):.1f}% faster (tokens/sec)")
 
     lines.append("=" * 80)
 
@@ -395,9 +383,7 @@ def format_comparison(qwen_data: dict[str, Any], glm_data: dict[str, Any]) -> st
 
 def main():
     """Main benchmark function."""
-    parser = argparse.ArgumentParser(
-        description="Benchmark Qwen3-Coder-Next vs GLM-4.7-Flash"
-    )
+    parser = argparse.ArgumentParser(description="Benchmark Qwen3-Coder-Next vs GLM-4.7-Flash")
     parser.add_argument(
         "--output",
         default="benchmark-results.json",

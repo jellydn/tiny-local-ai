@@ -1,216 +1,89 @@
-# AGENTS.md - Agent Coding Guidelines
+# AGENTS.md
 
-This file provides guidelines for agentic coding agents operating in this repository.
+**Tiny Local AI** — Run local LLM on MacBook A, access from MacBook B over LAN.
 
-## Project Overview
+## Languages & Dependencies
 
-**Tiny Local AI** - Run local LLM on MacBook A, access from MacBook B over LAN.
+- Python 3.10+ (`openai` package for client/router; `doctor.py`, `serve-dashboard.py` are stdlib-only)
+- Bash (server management scripts)
+- External: `llama-server` binary (from llama.cpp, in PATH or `scripts/`)
 
-- **Languages**: Python (CLI client, dashboard), Bash (server scripts)
-- **Dependencies**: llama.cpp, openai Python package
-- **No formal test suite** - This is a simple script collection
+Managed with `uv`. Install deps: `uv sync` (or `uv add <pkg>`).
 
----
+## Key Entrypoints (non-obvious)
 
-## Build / Run Commands
+| Entrypoint                  | What it does                                                                        |
+| --------------------------- | ----------------------------------------------------------------------------------- |
+| `swap` (root)               | Hot-swap models: `./swap status`, `./swap qwen`, `./swap glm`, `./swap --wait 120`  |
+| `scripts/doctor.py`         | Hardware detection + model recommendations via canirun.ai data                      |
+| `scripts/router.py`         | Smart routing — detects task type (coding vs general) and routes to the right model |
+| `scripts/swap-model.py`     | Python version of `swap` (called by the `swap` wrapper script)                      |
+| `scripts/download-model.sh` | Downloads GGUF models from HuggingFace                                              |
 
-### Python Scripts
-
-```bash
-# Install dependencies
-pip install openai
-
-# Run CLI client
-python scripts/llm-client.py "your prompt"
-
-# Run with streaming
-python scripts/llm-client.py -s "your prompt"
-
-# Save default config
-python scripts/llm-client.py --config -u http://localhost:8000/v1 -m qwen
-
-# Run dashboard
-python scripts/serve-dashboard.py
-
-# Run dashboard on custom port
-python scripts/serve-dashboard.py -p 9000
-```
-
-### Bash Scripts
+## Commands
 
 ```bash
-# Start server (requires llama-server binary in PATH or scripts/)
-./scripts/start-llm.sh qwen3-coder-next
+# Server
+./scripts/start-llm.sh qwen3-coder-next           # simple name
+./scripts/start-llm.sh unsloth/GLM-4.7-Flash-GGUF  # HF ref (auto-downloads)
+PORT=8080 ./scripts/start-llm.sh qwen              # custom port
+./scripts/stop-llm.sh                               # kills tmux session
 
-# With custom port
-PORT=8080 ./scripts/start-llm.sh qwen
+# Swap (uses hardcoded MODEL_CONFIGS in swap + swap-model.py)
+./swap status
+./swap qwen
+./swap glm --wait 120 --verbose
 
-# Stop server
-./scripts/stop-llm.sh
+# Download
+./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:Q4_K_M
+./scripts/download-model.sh --list unsloth/Qwen3-Coder-Next-GGUF
+
+# Client (uv run activates venv with openai)
+uv run python scripts/llm-client.py -s "prompt"            # streaming
+uv run python scripts/llm-client.py --system "You are..." "prompt"
+uv run python scripts/llm-client.py --config -u http://host:8000/v1 -m modelname
+
+# Dashboard
+uv run python scripts/serve-dashboard.py
+uv run python scripts/serve-dashboard.py -p 9000 -u http://192.168.1.100:8000
+
+# Router (requires both servers running)
+uv run python scripts/router.py "Write a function"    # auto-detect task type
+uv run python scripts/router.py "Hello" --model glm   # force model
+uv run python scripts/router.py "prompt" --stats      # routing stats
+
+# Hardware / benchmark
+uv run python scripts/doctor.py                             # hardware detection
+uv run python scripts/benchmark.py --categories coding      # quick benchmark
+./scripts/benchmark-startup.sh qwen3-coder-next 3           # startup timing
+
+# Lint + format (via Astral toolchain)
+uv run ruff check scripts/
+uv run ruff check scripts/ --fix
+uv run ruff format scripts/ --check
+uv run ruff format scripts/
 ```
 
-### Linting (Python)
+## Architecture Notes
 
-```bash
-# Run ruff linter
-ruff check scripts/
+- Server runs **inside tmux**, session name: `llm-server`. `stop-llm.sh` kills that session.
+- Models are cached in `~/Library/Caches/llama.cpp` (default) or `$HF_HOME`.
+- `scripts/start-llm.sh` detects RAM to auto-set context size (32K for ≥32GB, 16K for ≥16GB, 8K otherwise).
+- `swap` at repo root is a Python script; it calls `swap-model.py` internally. Hardcoded model configs for `qwen` and `glm`.
+- `data/hardware.json` and `data/models.json` are fetched from canirun.ai by `fetch-canirun-data.sh`.
+- No test suite. Ruff config lives in `pyproject.toml` (`[tool.ruff]`).
 
-# Auto-fix issues
-ruff check scripts/ --fix
-```
+## Environment Variables
 
----
+| Var              | Default                      | Used by                      |
+| ---------------- | ---------------------------- | ---------------------------- |
+| `LLM_SERVER_URL` | —                            | `llm-client.py`, `router.py` |
+| `LLM_MODEL`      | `qwen`                       | client scripts               |
+| `MODELS_DIR`     | `~/models`                   | `start-llm.sh`               |
+| `HF_HOME`        | `~/Library/Caches/llama.cpp` | model cache location         |
+| `PORT`           | `8000`                       | `start-llm.sh`               |
+| `HOST`           | `0.0.0.0`                    | `start-llm.sh`               |
 
-## Code Style Guidelines
+## Bash Style Quirk
 
-### General Principles
-
-- **Keep it simple** - This is a lightweight tool collection, not an enterprise app
-- **Self-documenting code** - Use clear names, add comments for non-obvious logic
-- **Fail fast with clear messages** - User-facing errors should explain what went wrong and how to fix it
-- **No over-engineering** - Avoid unnecessary abstractions
-
-### Python Style
-
-1. **Imports**
-   - Standard library first, then third-party
-   - Use absolute imports (`from openai import OpenAI`)
-   - Group: stdlib, third-party, local
-
-   ```python
-   import argparse
-   import os
-   import sys
-   from pathlib import Path
-
-   from openai import OpenAI
-   ```
-
-2. **Type Hints**
-   - Use type hints for function signatures
-   - Use `dict` not `Dict`, `list` not `List` (Python 3.9+)
-
-   ```python
-   def get_config_path() -> Path:
-       ...
-
-   def load_config() -> dict[str, str]:
-       ...
-   ```
-
-3. **Naming**
-   - `snake_case` for functions and variables
-   - `PascalCase` for classes (if any)
-   - CONSTANTS in UPPER_SNAKE_CASE
-
-4. **Formatting**
-   - Max line length: 100 characters
-   - Use 4 spaces for indentation
-   - Use f-strings for formatting
-   - One blank line between top-level definitions
-
-5. **Error Handling**
-   - Catch specific exceptions, not bare `except:`
-   - Print errors to stderr with `print(f"Error: {e}", file=sys.stderr)`
-   - Exit with code 1 on fatal errors
-
-   ```python
-   try:
-       response = client.chat.completions.create(...)
-   except Exception as e:
-       print(f"Error: {e}", file=sys.stderr)
-       sys.exit(1)
-   ```
-
-6. **Shebang**
-   - Python scripts: `#!/usr/bin/env python3`
-   - Add module docstring at top
-
-   ```python
-   #!/usr/bin/env python3
-   """Short description of what this script does."""
-   ```
-
-### Bash Style
-
-1. **Shebang and Options**
-
-   ```bash
-   #!/usr/bin/env bash
-
-   set -e  # Exit on error
-   set -u  # Exit on undefined variable
-   ```
-
-2. **Variables**
-   - Use `SCREAMING_SNAKE_CASE` for constants
-   - Use `camelCase` or `snake_case` for local variables
-   - Always quote variables: `"$VAR}"`, not `$VAR`
-
-3. **Functions**
-   - Use `local` for function-scope variables
-   - Use descriptive function names with underscores
-
-   ```bash
-   detect_ram() {
-       local RAM
-       RAM=$(sysctl -n hw.memsize 2>/dev/null || echo "34359738368")
-       ...
-   }
-   ```
-
-4. **Error Messages**
-   - Print errors to stderr: `echo "Error: message" >&2`
-   - Exit with code 1 on failure
-
-5. **Indentation**
-   - Use tabs for bash scripts (as shown in existing files)
-
----
-
-## File Organization
-
-```
-.
-├── scripts/
-│   ├── start-llm.sh      # Server startup (executable)
-│   ├── stop-llm.sh       # Server shutdown (executable)
-│   ├── llm-client.py     # CLI client
-│   └── serve-dashboard.py # Web dashboard
-├── models/                # GGUF model files (gitignored)
-├── .gitignore
-├── README.md
-└── LICENSE
-```
-
----
-
-## Documentation
-
-- **README.md** - User-facing documentation, quick start
-- **Inline comments** - Explain non-obvious logic only
-- **Error messages** - Should guide user to solution
-
----
-
-## Git Conventions
-
-- Use meaningful commit messages
-- Keep commits small and focused
-- No need for formal PR process (personal project)
-
----
-
-## Security Considerations
-
-- Never commit API keys or secrets
-- Use environment variables for configuration
-- Models directory is gitignored
-
----
-
-## Dependencies
-
-- Keep dependencies minimal
-- Python: only `openai` (for OpenAI-compatible API client)
-- No runtime needed beyond standard library (for scripts)
+- Indent with **tabs**, not spaces (existing scripts use tabs).

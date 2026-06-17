@@ -1,11 +1,12 @@
 #!/bin/bash
-# Fetch latest hardware and model data from canirun.ai
-# Usage: ./scripts/fetch-canirun-data.sh
-# Output: ../data/hardware.json and ../data/models.json
+# Fetch latest hardware and model data from canirun.ai (validator only)
+# Usage: ./scripts/fetch-canirun-data.sh (validator — does NOT overwrite data/*.json)
 #
 # Note: canirun.ai's data is in TypeScript packages. This script fetches
-# the raw data files and converts them to JSON for doctor.py to consume.
-# If the upstream format changes, this script needs updating.
+# the raw files for offline inspection and validates the upstream is reachable.
+# It does NOT regenerate data/*.json — those are committed snapshots consumed
+# by scripts/doctor.py. If the upstream format changes, this script and the
+# committed snapshots both need updating.
 
 set -euo pipefail
 
@@ -40,15 +41,34 @@ fetch_file "$CANIRUN_RAW/packages/compatibility/src/index.ts" "$TMP_DIR/compatib
 fetch_file "$CANIRUN_RAW/packages/models/src/index.ts" "$TMP_DIR/models.ts" || true
 fetch_file "$CANIRUN_RAW/src/data/gguf-sizes.json" "$TMP_DIR/gguf-sizes.json" || true
 
-# Check if we got usable data
-if [ ! -s "$TMP_DIR/compatibility.ts" ] && [ ! -s "$TMP_DIR/models.ts" ]; then
-    echo "  [ERROR] Could not fetch canirun.ai data. Using bundled JSON files." >&2
-    echo "  Run doctor.py with the bundled data — it will still work." >&2
-    exit 0
-fi
+# Validate downloaded files and report status
+echo ""
+echo "Downloaded files:"
+failed=0
+for file in compatibility.ts models.ts gguf-sizes.json; do
+    if [ -f "$TMP_DIR/$file" ] && [ -s "$TMP_DIR/$file" ]; then
+        echo "  ✓ $file"
+    else
+        echo "  ✗ $file (missing or empty)"
+        failed=$((failed + 1))
+    fi
+done
 
-echo "Data fetched to $TMP_DIR"
-echo "Note: TypeScript-to-JSON conversion is done at build time."
-echo "The bundled data/ directory contains the current snapshot."
-echo "To update: edit data/hardware.json and data/models.json directly,"
-echo "or extend this script to parse the TypeScript source."
+# Note: TypeScript-to-JSON conversion is not yet implemented.
+# This script validates canirun.ai upstream is reachable and the bundled
+# data/ directory still matches the expected shape. It does NOT regenerate
+# data/*.json — those are committed snapshots maintained by the project.
+# If you need to refresh hardware or model data, see scripts/doctor.py
+# (which reads the bundled JSON) and the canirun.ai data fetch workflow.
+echo ""
+echo "Note: TypeScript-to-JSON conversion is not yet implemented."
+echo "data/*.json are maintained as committed snapshots."
+echo "Run scripts/doctor.py to see the current recommendations."
+
+# Ensure we got usable core data (at least one of compatibility.ts or models.ts must exist and be non-empty)
+if [ ! -s "$TMP_DIR/compatibility.ts" ] && [ ! -s "$TMP_DIR/models.ts" ]; then
+    echo ""
+    echo "  [ERROR] Could not fetch core canirun.ai data. Using bundled JSON files." >&2
+    echo "  Run doctor.py with the bundled data — it will still work." >&2
+    exit 1
+fi

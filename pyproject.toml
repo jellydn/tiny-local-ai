@@ -1,0 +1,22 @@
+[project]
+name = "tiny-local-ai"
+version = "0.1.0"
+description = "Run local LLM on MacBook A, access from MacBook B over LAN"
+requires-python = ">=3.10"
+dependencies = [
+    "gradio-client>=2.5.0",
+    "openai>=2.41.1",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+include = ["scripts/**/*.py", "swap"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP"]
+ignore = ["E402"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

@@ -5,10 +5,9 @@ import argparse
 import json
 import os
 import sys
-import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.request import urlopen
 from urllib.error import URLError
+from urllib.request import urlopen
 
 DEFAULT_URL = os.getenv("LLM_SERVER_URL", "http://localhost:8000")
 
@@ -156,13 +155,9 @@ def main():
     else:
         status_class = "offline"
         status_text = "Server Offline"
-        content = (
-            '<div class="card"><div class="error">Server is not responding</div></div>'
-        )
+        content = '<div class="card"><div class="error">Server is not responding</div></div>'
 
-    html = HTML_TEMPLATE.format(
-        status_class=status_class, status_text=status_text, content=content
-    )
+    html = HTML_TEMPLATE.format(status_class=status_class, status_text=status_text, content=content)
 
     class Handler(SimpleHTTPRequestHandler):
         def do_GET(self):

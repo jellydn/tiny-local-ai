@@ -39,11 +39,13 @@ suggest_quant() {
 	# Delegate to doctor.py for model recommendations (single source of truth)
 	if command -v python3 &>/dev/null; then
 		python3 "$SCRIPT_DIR/doctor.py" 2>/dev/null
+		echo ""
+		echo "For the full list, run: python3 scripts/doctor.py"
 	else
 		echo "python3 not found. For detailed recommendations, visit:"
 		echo "  https://www.canirun.ai/"
+		echo "Install python3 to use scripts/doctor.py locally."
 	fi
-
 	echo ""
 	echo "Data powered by canirun.ai"
 }
@@ -89,21 +91,92 @@ find_cached_model() {
 
 	local repo_slug="${repo//\//_}"
 
+	# Check for monolithic file
 	local found
-	found=$(ls "$cache_dir" 2>/dev/null | grep "^${repo_slug}_.*${quant}\.gguf$" | head -1)
-	if [ -n "$found" ]; then
-		echo "$cache_dir/$found"
-		return 0
-	fi
-
 	found=$(ls "$cache_dir" 2>/dev/null | grep "^${repo_slug}_${quant}\.gguf$" | head -1)
 	if [ -n "$found" ]; then
 		echo "$cache_dir/$found"
 		return 0
 	fi
 
+	# Check for sharded directory
+	local shard_dir="$cache_dir/${repo_slug}_${quant}"
+	if [ -d "$shard_dir" ] && ls "$shard_dir"/*.gguf &>/dev/null 2>&1; then
+		echo "$shard_dir"
+		return 0
+	fi
+
 	echo ""
 }
+
+resolve_model_urls() {
+	local repo="$1"
+	local quant="$2"
+	local token="${HF_TOKEN:-}"
+
+	local repo_name="${repo##*/}"
+	local model_base="${repo_name%-GGUF}"
+
+	local api_args=()
+	if [ -n "$token" ]; then
+		api_args=(-H "Authorization: Bearer $token")
+	fi
+
+	curl -s "${api_args[@]}" "https://huggingface.co/api/models/$repo/revision/main" 2>/dev/null | \
+		python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+ggufs = sorted(s['rfilename'] for s in d.get('siblings', []) if s.get('rfilename', '').endswith('.gguf'))
+repo_base = '$model_base'
+quant = '$quant'
+mono = f'{repo_base}-{quant}.gguf'
+# Two sharded-layout conventions exist across HF:
+#   1. <quant>/<repo_base>-<quant>-NNNN-of-NNNNN.gguf       (some repos)
+#   2. <repo_base>-<quant>.gguf/<repo_base>-<quant>-NNNN.gguf  (bartowski-style)
+shards = sorted(
+    f for f in ggufs
+    if f.startswith(f'{quant}/{repo_base}-{quant}-')
+    or f.startswith(f'{repo_base}-{quant}.gguf/{repo_base}-{quant}-')
+)
+if mono in ggufs:
+    print(f'https://huggingface.co/$repo/resolve/main/{mono}')
+elif shards:
+    for f in shards:
+        print(f'https://huggingface.co/$repo/resolve/main/{f}')
+else:
+    sys.exit(2)
+"
+}
+
+download_one() {
+	local url="$1"
+	local out="$2"
+	local token="$3"
+
+	echo "  → $out"
+
+	if [ -n "$token" ]; then
+		curl -L -H "Authorization: Bearer $token" -o "$out" "$url" --progress-bar 2>&1
+	else
+		curl -L -o "$out" "$url" --progress-bar 2>&1
+	fi
+
+	echo ""		local magic
+		magic=$(head -c 4 "$out" 2>/dev/null)
+		if [ "$magic" = "GGUF" ]; then
+			echo "  ✓ Saved: $out"
+			return 0
+		else
+			local preview
+			preview=$(head -c 80 "$out" 2>/dev/null | tr -c '[:print:]	' '?')
+			rm -f "$out"
+			printf '  \xe2\x9c\x97 Invalid file (not GGUF). First bytes: %s\n' "$preview"
+			return 1
+		fi
+	}
 
 download_model() {
 	local repo="$1"
@@ -111,86 +184,60 @@ download_model() {
 	local cache_dir="$3"
 	local token="${HF_TOKEN:-}"
 
-	echo "Downloading model..."
-	echo "This may take several minutes depending on model size and network speed."
+	echo "Resolving file paths from HuggingFace API..."
 	echo ""
 
 	local repo_slug="${repo//\//_}"
-	local model_file="${repo_slug}_${quant}.gguf"
-	local output_path="$cache_dir/$model_file"
-
 	mkdir -p "$cache_dir"
 
-	# Extract model base name (remove -GGUF suffix if present)
-	local repo_name="${repo##*/}"
-	local model_base="${repo_name%-GGUF}"
-
-	# Try different URL patterns in order of likelihood
-	local urls=()
-
-	# Pattern 1: Root level with model base name (e.g., Qwen3-Coder-Next-UD-IQ1_S.gguf)
-	urls+=("https://huggingface.co/$repo/resolve/main/${model_base}-${quant}.gguf")
-
-	# Pattern 2: In quantization subfolder with model base (e.g., Q4_K_M/Qwen3-Coder-Next-Q4_K_M.gguf)
-	urls+=("https://huggingface.co/$repo/resolve/main/${quant}/${model_base}-${quant}.gguf")
-
-	# Pattern 3: In quantization subfolder with part number (e.g., Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00001-of-00003.gguf)
-	urls+=("https://huggingface.co/$repo/resolve/main/${quant}/${model_base}-${quant}-00001-of-00003.gguf")
-
-	local success=false
-	for url in "${urls[@]}"; do
-		# Skip if file already exists and is valid
-		if [ -f "$output_path" ] && [ -s "$output_path" ]; then
-			# Check if it's a valid GGUF file (starts with magic bytes GGUF)
-			local magic
-			magic=$(head -c 4 "$output_path" 2>/dev/null)
-			if [ "$magic" = "GGUF" ]; then
-				echo ""
-				echo "✓ Model already cached"
-				success=true
-				break
-			fi
-		fi
-
-		# Remove incomplete/invalid file before trying next URL
-		rm -f "$output_path"
-
-		echo "Trying: $url"
-
-		if [ -n "$token" ]; then
-			curl -L -H "Authorization: Bearer $token" -o "$output_path" "$url" --progress-bar 2>&1
-		else
-			curl -L -o "$output_path" "$url" --progress-bar 2>&1
-		fi
-
-		echo ""
-
-		# Validate downloaded file
-		if [ -f "$output_path" ] && [ -s "$output_path" ]; then
-			local magic
-			magic=$(head -c 4 "$output_path" 2>/dev/null)
-			if [ "$magic" = "GGUF" ]; then
-				echo "✓ Downloaded to: $output_path"
-				success=true
-				break
-			else
-				# File was downloaded but is invalid (probably error page)
-				rm -f "$output_path"
-				echo "✗ Invalid file (not GGUF format). Trying next URL..."
-				echo ""
-			fi
-		else
-			echo "✗ Download failed. Trying next URL..."
-			echo ""
-		fi
-	done
-
-	if [ "$success" = false ]; then
-		echo "Error: Download failed for all URL patterns."
-		echo "The model file may not exist or the repository structure is different."
-		echo ""
+	local urls
+	local lookup_status
+	urls=$(resolve_model_urls "$repo" "$quant" "$token")
+	lookup_status=$?
+	if [ "$lookup_status" = 1 ]; then
+		echo "Error: HuggingFace API lookup failed for $repo (network or auth error)."
+		echo "Check your connection and HF_TOKEN settings, then retry."
+		exit 1
+	fi
+	if [ -z "$urls" ]; then
+		echo "Error: no files matching $quant found in repo $repo."
 		echo "Try listing available models: ./download-model.sh --list $repo"
 		exit 1
+	fi
+
+	local url_count
+	url_count=$(echo "$urls" | wc -l | tr -d ' ')
+
+	if [ "$url_count" -gt 1 ]; then
+		# Sharded model — download each shard into a per-quant subdirectory
+		local shard_dir="$cache_dir/${repo_slug}_${quant}"
+		mkdir -p "$shard_dir"
+		echo "Downloading $url_count shards into $shard_dir/"
+		echo ""
+		local failed=false
+		while IFS= read -r url; do
+			local fname="${url##*/}"
+			local shard_path="$shard_dir/$fname"
+			if ! download_one "$url" "$shard_path" "$token"; then
+				failed=true
+				break
+			fi
+		done <<<"$urls"
+		if [ "$failed" = true ]; then
+			# Wipe partial state so find_cached_model won't claim a half-broken set as cached
+			rm -rf "$shard_dir"
+			exit 1
+		fi
+	else
+		# Monolithic model — single file at standard path
+		local url
+		url=$(echo "$urls" | head -1)
+		local output_path="$cache_dir/${repo_slug}_${quant}.gguf"
+		echo "Downloading monolithic file:"
+		echo ""
+		if ! download_one "$url" "$output_path" "$token"; then
+			exit 1
+		fi
 	fi
 }
 
@@ -227,9 +274,6 @@ list_available_models() {
 		echo ""
 		echo "Usage: $0 <repo>:<quant>"
 		echo "Example: $0 $repo:Q4_K_M"
-		echo "Example: $0 $repo:UD-Q4_K_XL"
-		echo ""
-		echo "Usage: $0 <repo>:<quant>"
 		echo "Example: $0 $repo:UD-Q4_K_XL"
 	else
 		echo "Could not fetch model list. Make sure the repository exists."

@@ -38,41 +38,41 @@
   },
   "DeepSeek-Coder-V2": {
     "name": "DeepSeek-Coder-V2",
-    "repo": "unsloth/DeepSeek-Coder-V2-GGUF",
+    "repo": "bartowski/DeepSeek-Coder-V2-Instruct-GGUF",
     "params": "16B MoE",
     "type": "coding",
     "quants": {
-      "Q4_K_M": {"size_gb": 8.0, "quality": "good", "bits": 4},
-      "Q5_K_M": {"size_gb": 10.0, "quality": "very_good", "bits": 5}
+      "Q3_K_XL": {"size_gb": 6.5, "quality": "medium", "bits": 3},
+      "Q4_K_M": {"size_gb": 8.0, "quality": "good", "bits": 4}
     },
     "use_cases": ["code generation", "debugging"]
   },
-  "MiniMax-M2.5": {
-    "name": "MiniMax-M2.5",
-    "repo": "unsloth/MiniMax-M2.5-GGUF",
-    "params": "200B MoE",
-    "type": "reasoning",
-    "quants": {
-      "UD-IQ1_S": {"size_gb": 55.0, "quality": "low", "bits": 1},
-      "Q4_K_M": {"size_gb": 120.0, "quality": "good", "bits": 4}
-    },
-    "use_cases": ["reasoning", "complex tasks"]
-  },
-  "Llama-3.1-8B": {
-    "name": "Llama 3.1 8B",
-    "repo": "unsloth/Llama-3.1-8B-GGUF",
+  "DeepSeek-R1-Distill-Llama-8B": {
+    "name": "DeepSeek-R1-Distill-Llama-8B",
+    "repo": "unsloth/DeepSeek-R1-Distill-Llama-8B-GGUF",
     "params": "8B dense",
-    "type": "general",
+    "type": "reasoning",
     "quants": {
       "Q4_K_M": {"size_gb": 4.9, "quality": "good", "bits": 4},
       "Q5_K_M": {"size_gb": 5.7, "quality": "very_good", "bits": 5},
       "Q8_0": {"size_gb": 8.5, "quality": "excellent", "bits": 8}
     },
+    "use_cases": ["reasoning", "math", "complex analysis"]
+  },  "Llama-3.3-8B": {
+    "name": "Llama 3.3 8B",
+    "repo": "mradermacher/Llama-3.3-8B-Instruct-GGUF",
+    "params": "8B dense",
+    "type": "general",
+    "quants": {
+      "Q4_K_M": { "size_gb": 4.9, "quality": "good", "bits": 4 },
+      "Q5_K_M": { "size_gb": 5.7, "quality": "very_good", "bits": 5 },
+      "Q6_K": { "size_gb": 6.1, "quality": "very_good", "bits": 6 }
+    },
     "use_cases": ["general", "chat", "fast inference"]
   },
   "Phi-4": {
     "name": "Phi-4",
-    "repo": "unsloth/Phi-4-GGUF",
+    "repo": "bartowski/phi-4-GGUF",
     "params": "14B dense",
     "type": "general",
     "quants": {
@@ -83,7 +83,7 @@
   },
   "Gemma-3-4B": {
     "name": "Gemma 3 4B",
-    "repo": "unsloth/Gemma-3-4B-GGUF",
+    "repo": "unsloth/gemma-3-4b-it-GGUF",
     "params": "4B dense",
     "type": "general",
     "quants": {
@@ -91,5 +91,80 @@
       "Q8_0": {"size_gb": 4.5, "quality": "excellent", "bits": 8}
     },
     "use_cases": ["fast responses", "low memory", "lightweight"]
+  },
+  "Llama-4-Maverick": {
+    "name": "Llama 4 Maverick 17Bx128E Instruct",
+    "repo": "unsloth/Llama-4-Maverick-17B-128E-Instruct-GGUF",
+    "params": "17Bx128E MoE (~17B active; server-class, ≥192 GB RAM required)",
+    "type": "general",
+    "quants": {
+      "Q2_K": {"size_gb": 148.5, "quality": "low", "bits": 2},
+      "Q3_K_M": {"size_gb": 197.8, "quality": "medium", "bits": 3},
+      "Q4_K_M": {"size_gb": 247.0, "quality": "good", "bits": 4},
+      "Q6_K": {"size_gb": 331.4, "quality": "very_good", "bits": 6}
+    },
+    "use_cases": ["chat", "reasoning", "general"]
+  },
+  "DeepSeek-R1-Distill-Qwen-7B": {
+    "name": "DeepSeek R1 Distill Qwen 7B",
+    "repo": "unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF",
+    "params": "7B dense (DeepSeek-R1 distilled)",
+    "type": "reasoning",
+    "quants": {
+      "Q4_K_M": {"size_gb": 4.7, "quality": "good", "bits": 4},
+      "Q5_K_M": {"size_gb": 5.4, "quality": "very_good", "bits": 5},
+      "Q8_0": {"size_gb": 8.1, "quality": "excellent", "bits": 8}
+    },
+    "use_cases": ["reasoning", "math", "analysis"]
+  },
+  "Mistral-Nemo-12B": {
+    "name": "Mistral Nemo 12B",
+    "repo": "unsloth/Mistral-Nemo-Instruct-2407-GGUF",
+    "params": "12B dense (Mistral + NVIDIA collaboration)",
+    "type": "general",
+    "quants": {
+      "Q3_K_M": {"size_gb": 6.1, "quality": "medium", "bits": 3},
+      "Q4_K_M": {"size_gb": 7.5, "quality": "good", "bits": 4},
+      "Q5_K_M": {"size_gb": 8.7, "quality": "very_good", "bits": 5},
+      "Q6_K": {"size_gb": 10.1, "quality": "very_good", "bits": 6}
+    },
+    "use_cases": ["chat", "general", "multilingual"]
+  },
+  "Qwen2.5-Coder-7B": {
+    "name": "Qwen2.5 Coder 7B",
+    "repo": "unsloth/Qwen2.5-Coder-7B-Instruct-GGUF",
+    "params": "7B dense",
+    "type": "coding",
+    "quants": {
+      "Q3_K_M": {"size_gb": 3.8, "quality": "medium", "bits": 3},
+      "Q4_K_M": {"size_gb": 4.7, "quality": "good", "bits": 4},
+      "Q5_K_M": {"size_gb": 5.4, "quality": "very_good", "bits": 5}
+    },
+    "use_cases": ["code generation", "debugging", "refactoring"]
+  },
+  "Qwen2.5-Coder-14B": {
+    "name": "Qwen2.5 Coder 14B",
+    "repo": "unsloth/Qwen2.5-Coder-14B-Instruct-GGUF",
+    "params": "14B dense",
+    "type": "coding",
+    "quants": {
+      "Q3_K_M": {"size_gb": 7.3, "quality": "medium", "bits": 3},
+      "Q4_K_M": {"size_gb": 9.0, "quality": "good", "bits": 4},
+      "Q5_K_M": {"size_gb": 10.5, "quality": "very_good", "bits": 5}
+    },
+    "use_cases": ["code generation", "debugging", "refactoring"]
+  },
+  "Qwen3-14B": {
+    "name": "Qwen3 14B",
+    "repo": "unsloth/Qwen3-14B-GGUF",
+    "params": "14B dense",
+    "type": "general",
+    "quants": {
+      "Q4_K_M": {"size_gb": 9.0, "quality": "good", "bits": 4},
+      "UD-Q4_K_XL": {"size_gb": 9.2, "quality": "good", "bits": 4},
+      "Q5_K_M": {"size_gb": 10.5, "quality": "very_good", "bits": 5},
+      "Q8_0": {"size_gb": 15.7, "quality": "excellent", "bits": 8}
+    },
+    "use_cases": ["chat", "general", "reasoning"]
   }
 }

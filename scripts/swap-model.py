@@ -2,13 +2,10 @@
 """Hot-swap model on running llama-server without downtime."""
 
 import argparse
-import os
-import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional, Tuple
 
 MODELS_CACHE = Path.home() / "Library/Caches/llama.cpp"
 LLAMA_SERVER = "/opt/homebrew/bin/llama-server"
@@ -37,7 +34,7 @@ MODEL_CONFIGS = {
 import json
 
 
-def is_server_healthy() -> Tuple[bool, Optional[str]]:
+def is_server_healthy() -> tuple[bool, str | None]:
     """Check if server is healthy and responding correctly.
 
     Returns:
@@ -65,7 +62,7 @@ def is_server_healthy() -> Tuple[bool, Optional[str]]:
         return False, None
 
 
-def get_current_model(verbose: bool = False) -> Optional[str]:
+def get_current_model(verbose: bool = False) -> str | None:
     """Check which model is currently running with retries."""
     max_retries = 3
     retry_delay = 1
@@ -97,9 +94,7 @@ def get_current_model(verbose: bool = False) -> Optional[str]:
     return None
 
 
-def wait_for_server(
-    timeout: int = 90, verbose: bool = False, progress_interval: int = 5
-) -> bool:
+def wait_for_server(timeout: int = 90, verbose: bool = False, progress_interval: int = 5) -> bool:
     """Wait for server to become ready with improved validation.
 
     Args:
@@ -133,7 +128,7 @@ def wait_for_server(
     return False
 
 
-def check_process_running() -> Optional[Tuple[str, str]]:
+def check_process_running() -> tuple[str, str] | None:
     """Check if llama-server process is running.
 
     Returns:
@@ -176,11 +171,11 @@ def stop_server() -> bool:
 
 def start_server(model_key: str, wait_timeout: int = 90) -> bool:
     """Start llama-server with specified model.
-    
+
     Args:
         model_key: Model identifier (qwen or glm)
         wait_timeout: Maximum seconds to wait for server startup
-    
+
     Returns:
         True if server started and became healthy, False otherwise
     """
@@ -228,10 +223,14 @@ def start_server(model_key: str, wait_timeout: int = 90) -> bool:
         # Server didn't respond, check if process is still alive
         proc_info = check_process_running()
         if proc_info:
-            print(f"✗ Server process started but failed to become ready (timeout after {wait_timeout}s)")
-            print(f"  Try checking system resources or increasing timeout with: ./swap {model_key} --wait 120")
+            print(
+                f"✗ Server process started but failed to become ready (timeout after {wait_timeout}s)"
+            )
+            print(
+                f"  Try checking system resources or increasing timeout with: ./swap {model_key} --wait 120"
+            )
         else:
-            print(f"✗ Server process exited unexpectedly")
+            print("✗ Server process exited unexpectedly")
             print(f"  Try running: llama-server -m {model_path}")
         return False
     except Exception as e:
@@ -239,13 +238,13 @@ def start_server(model_key: str, wait_timeout: int = 90) -> bool:
         return False
 
 
-def swap_model(target_model: str, wait_timeout: int = 90) -> Tuple[bool, str]:
+def swap_model(target_model: str, wait_timeout: int = 90) -> tuple[bool, str]:
     """Swap to a different model with minimal downtime.
-    
+
     Args:
         target_model: Target model identifier (qwen or glm)
         wait_timeout: Maximum seconds to wait for server startup
-    
+
     Returns:
         Tuple of (success: bool, message: str)
     """
@@ -262,7 +261,7 @@ def swap_model(target_model: str, wait_timeout: int = 90) -> Tuple[bool, str]:
         print("Stopping current server...")
         stop_server()
 
-    print(f"Starting new model...")
+    print("Starting new model...")
     if start_server(target_model, wait_timeout=wait_timeout):
         config = MODEL_CONFIGS[target_model]
         return True, f"✓ Swapped to {config['name']}"
@@ -282,17 +281,17 @@ def status() -> None:
     if current:
         config = MODEL_CONFIGS[current]
         print(f"  Model:     {config['name']}")
-        print(f"  Status:    ✅ Running")
-        print(f"  URL:       http://localhost:8000/v1")
+        print("  Status:    ✅ Running")
+        print("  URL:       http://localhost:8000/v1")
     elif proc_info:
         proc_output, model_key = proc_info
         if model_key:
             config = MODEL_CONFIGS[model_key]
             print(f"  Model:     {config['name']}")
-            print(f"  Status:    ⏳ Starting (process running, waiting for API...)")
-            print(f"  URL:       http://localhost:8000/v1 (not yet responding)")
+            print("  Status:    ⏳ Starting (process running, waiting for API...)")
+            print("  URL:       http://localhost:8000/v1 (not yet responding)")
         else:
-            print(f"  Status:    ⏳ Server starting (model unknown)")
+            print("  Status:    ⏳ Server starting (model unknown)")
             print(f"  Process:   {proc_output[:80]}...")
     else:
         print("  Status:    ❌ No server running")

@@ -42,9 +42,7 @@ def main():
     parser.add_argument("-m", "--model", default=DEFAULT_MODEL, help="Model name")
     parser.add_argument("-u", "--url", default=DEFAULT_URL, help="Server URL")
     parser.add_argument("-s", "--stream", action="store_true", help="Stream response")
-    parser.add_argument(
-        "-c", "--config", action="store_true", help="Save as default config"
-    )
+    parser.add_argument("-c", "--config", action="store_true", help="Save as default config")
     parser.add_argument("--system", help="System prompt")
     args = parser.parse_args()
 

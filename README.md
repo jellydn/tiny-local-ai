@@ -53,7 +53,7 @@ Get GGUF models from HuggingFace (Recommended):
 
 - [Qwen3-Coder-Next-80B](https://huggingface.co/unsloth/Qwen3-Coder-Next-GGUF) - Best for code generation
 - [GLM-4.7-Flash](https://huggingface.co/unsloth/GLM-4.7-Flash-GGUF) - Balances performance and efficiency
-- [MiniMax-M2.5](https://huggingface.co/unsloth/MiniMax-M2.5-GGUF) - Best reasoning, compact
+- [DeepSeek-R1-Distill-Llama-8B](https://huggingface.co/unsloth/DeepSeek-R1-Distill-Llama-8B-GGUF) - Reasoning-focused, fits 32GB at Q8_0
 
 **Recommended Models by Hardware:**
 
@@ -67,7 +67,7 @@ Or visit [canirun.ai](https://www.canirun.ai/) directly.
 
 | Hardware           | Model                    | Quant        | Size   | Speed       |
 | ------------------ | ------------------------ | ------------ | ------ | ----------- |
-| M3/M4 Max 36-128GB | MiniMax-M2.5             | Q4_K_M       | ~120G  | 5-10 tok/s  |
+| M3/M4 Max 36-128GB | (run doctor.py)         | any          | varies | varies      |
 | M2/M3 Max 32GB     | Qwen3-Coder-Next         | UD-IQ1_S     | ~21.5G | 4-8 tok/s   |
 | M2/M3 Max 32GB     | GLM-4.7-Flash            | Q4_K_M       | ~18G   | 15-25 tok/s |
 | M1/M2 Pro 16GB     | Qwen3-8B                 | Q4_K_M       | ~5G    | 15-25 tok/s |
@@ -172,7 +172,27 @@ Powered by [canirun.ai](https://www.canirun.ai/) hardware database. Auto-detects
 python3 scripts/doctor.py
 ```
 
-Output:
+### How it works
+
+`scripts/doctor.py` is a stdlib-only Python script — no `pip install` needed. On every run it does two things:
+
+1. **Detects your hardware.** On macOS it parses `sysctl` for Apple Silicon chip + variant, CPU/GPU core counts, RAM, and Metal device. On Linux the script doesn't parse `/proc` or `lspci` — it relies on the stdlib `platform` module for CPU/RAM and adds explicit NVIDIA GPU detection via `nvidia-smi`.
+2. **Looks up compatible models in the local snapshot.** It reads the committed `data/hardware.json` and `data/models.json` files (last refreshed via `./scripts/fetch-canirun-data.sh`) and picks the models that fit your RAM budget, sorted by relevance to the detected hardware.
+
+The script then prints three blocks plus a system check (see the example below). Nothing is sent over the network at runtime — recommendations come from the JSON snapshot shipped in this repo.
+
+### Reading the output
+
+The output is split into four sections:
+
+- **DETECTED HARDWARE** — what the script saw on this machine (chip, cores, RAM, Metal/CUDA). This is the input that drives the recommendations.
+- **RECOMMENDED MODELS (via canirun.ai)** — a numbered list of models known to fit your RAM, each with `Size (GB)`, `Quant`, expected `tok/s`, and `Type` (`coding` / `reasoning` / `general`). For every row the doctor prints two ready-to-run commands:
+  - `verify → ./scripts/download-model.sh --list <repo>` — confirm the quantization still exists upstream.
+  - `download → ./scripts/download-model.sh <repo>:<quant>` — fetch the GGUF into your cache.
+- **SYSTEM CHECK** — sanity-checks the runtime prerequisites: `llama-server` binary on `PATH`, model cache directory (`$HF_HOME`, defaults to `~/Library/Caches/llama.cpp`), and how many GGUF files are already cached locally.
+- **Diagnostics complete** — script exit marker. The script never makes network calls at runtime; if you see this line, the lookup used the local snapshot.
+
+### Example output (Apple M2 Pro, 32 GB)
 
 ```
 ============================================================
@@ -183,22 +203,44 @@ Output:
 ============================================================
   DETECTED HARDWARE
 ============================================================
-  Chip:                 Apple M1 Max
-  Variant:              max
-  CPU Cores:            10
-  GPU Cores:            24
+  Chip:                 Apple M2 Pro
+  Variant:              base
+  CPU Cores:            12
+  GPU Cores:            16
   RAM:                  32 GB
   RAM Available:        28 GB
   Metal Support:        Yes
+  Metal Device:         Metal 4
 
 ============================================================
   RECOMMENDED MODELS (via canirun.ai)
 ============================================================
-  #    Model                     Size     Quant        tok/s   Type
-  ---- ------------------------- -------- ------------ ------- ------------
-  1    GLM-4.7-Flash             16.3     UD-Q4_K_XL  41      general
-  2    DeepSeek-Coder-V2         8.0      Q4_K_M      35      coding
-  3    Qwen3-8B                  5.0      Q4_K_M      25      general
+  #    Model                     Size     Quant        tok/s    Type
+  ---- ------------------------- -------- ------------ -------- ------------
+  1    DeepSeek-Coder-V2         8.0      Q4_K_M       15       coding
+       verify → ./scripts/download-model.sh --list bartowski/DeepSeek-Coder-V2-Instruct-GGUF
+       download → ./scripts/download-model.sh bartowski/DeepSeek-Coder-V2-Instruct-GGUF:Q4_K_M
+  2    DeepSeek-R1-Distill-Llama-8B 8.5      Q8_0         15       reasoning
+       verify → ./scripts/download-model.sh --list unsloth/DeepSeek-R1-Distill-Llama-8B-GGUF
+       download → ./scripts/download-model.sh unsloth/DeepSeek-R1-Distill-Llama-8B-GGUF:Q8_0
+  3    Gemma 3 4B                4.5      Q8_0         19       general
+       verify → ./scripts/download-model.sh --list unsloth/gemma-3-4b-it-GGUF
+       download → ./scripts/download-model.sh unsloth/gemma-3-4b-it-GGUF:Q8_0
+  4    Qwen3-8B                  8.5      Q8_0         15       general
+       verify → ./scripts/download-model.sh --list unsloth/Qwen3-8B-GGUF
+       download → ./scripts/download-model.sh unsloth/Qwen3-8B-GGUF:Q8_0
+  5    Llama 3.1 8B              8.5      Q8_0         15       general
+       verify → ./scripts/download-model.sh --list bartowski/Meta-Llama-3.1-8B-Instruct-GGUF
+       download → ./scripts/download-model.sh bartowski/Meta-Llama-3.1-8B-Instruct-GGUF:Q8_0
+  6    Phi-4                     10.0     Q5_K_M       15       general
+       verify → ./scripts/download-model.sh --list bartowski/phi-4-GGUF
+       download → ./scripts/download-model.sh bartowski/phi-4-GGUF:Q5_K_M
+  7    GLM-4.7-Flash             21.0     Q5_K_M       5        general
+       verify → ./scripts/download-model.sh --list unsloth/GLM-4.7-Flash-GGUF
+       download → ./scripts/download-model.sh unsloth/GLM-4.7-Flash-GGUF:Q5_K_M
+  8    Qwen3-Coder-Next          21.5     UD-IQ1_S     5        coding
+       verify → ./scripts/download-model.sh --list unsloth/Qwen3-Coder-Next-GGUF
+       download → ./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
 
   Data source: https://www.canirun.ai/
   Model source: https://unsloth.ai/
@@ -207,9 +249,33 @@ Output:
   SYSTEM CHECK
 ============================================================
   [OK] llama-server: /opt/homebrew/bin/llama-server
-  [OK] Model cache: ~/Library/Caches/llama.cpp
-  [INFO] Cached models: 2
+  [OK] Model cache: /Users/<you>/Library/Caches/llama.cpp
+  [INFO] Cached models: 0      # 0 here because this example ran before any downloads; yours will reflect what's already in `$HF_HOME`
+
+============================================================
+  Diagnostics complete
+============================================================
 ```
+
+### Acting on a recommendation
+
+A typical flow after running the doctor is:
+
+```bash
+# 1. Pick a row from RECOMMENDED MODELS, e.g. Qwen3-Coder-Next (UD-IQ1_S).
+# 2. Verify the quantization still exists on HuggingFace:
+./scripts/download-model.sh --list unsloth/Qwen3-Coder-Next-GGUF
+
+# 3. Download it (resumable, validates GGUF magic bytes on completion):
+./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
+
+# 4. Start the server:
+./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
+```
+
+If `python3` is missing the script prints a clear "python3 not found" hint instead of crashing — install Python 3.10+ and re-run.
+
+> **Note on sharded models.** Some upstream repos (notably bartowski) split a given quantization across multiple `.gguf` shards inside a `<repo>_<quant>/` cache directory (e.g. 4 shards for `bartowski/DeepSeek-Coder-V2-Instruct-GGUF:Q4_K_M`). `download-model.sh` downloads them all atomically and validates each shard's GGUF magic bytes; `start-llm.sh` then loads the directory. This is expected — not a download failure.
 
 ## Smart Router
 
