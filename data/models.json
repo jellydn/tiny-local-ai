@@ -95,7 +95,7 @@
   "Llama-4-Maverick": {
     "name": "Llama 4 Maverick 17Bx128E Instruct",
     "repo": "unsloth/Llama-4-Maverick-17B-128E-Instruct-GGUF",
-    "params": "17Bx128E MoE (~17B active)",
+    "params": "17Bx128E MoE (~17B active; server-class, ≥192 GB RAM required)",
     "type": "general",
     "quants": {
       "Q2_K": {"size_gb": 148.5, "quality": "low", "bits": 2},
