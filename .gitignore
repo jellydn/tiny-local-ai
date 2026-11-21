@@ -1,14 +1,31 @@
-# Models (GGUF files - large, downloaded separately)
-models/
+# Local model weights and downloaded runtimes
+/models/
+/runtime/
 *.gguf
+*.safetensors
+*.ckpt
+*.pt
+*.pth
 
-# Config
+# Local Python environments
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
 .config/
 
-# Python
-__pycache__/
-*.pyc
-.venv/
+# Local experiment output
+/outputs/
+/checkpoints/
+/runs/
+/out-*/
+*.log
 
-# OS
+# Operating system files
 .DS_Store
+Thumbs.db

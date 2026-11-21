@@ -2,7 +2,7 @@
 
 A beginner handbook for running AI on your own computer, with **Inkling 2 Mini** as the main example. Learn to run a model, select hardware, test results, fine-tune for a task, and train a small model for education.
 
-This repository contains Bash and Python tools for local inference. It does not contain Inkling weights, a Mini training pipeline, or a recipe to reproduce its pretraining.
+This repository is a documentation handbook. It contains setup examples and links to external tools. It does not contain model weights, bundled inference tools, a Mini training pipeline, or a recipe to reproduce its pretraining.
 
 **Sources checked: 21 November 2026.** Model support changes quickly. Check the linked runtime guide before downloading large files.
 
@@ -15,7 +15,7 @@ This repository contains Bash and Python tools for local inference. It does not 
 | Add your documents | [Prompting and retrieval](#before-you-train) | Answers with relevant source text |
 | Change response style or task behaviour | [Fine-tuning](#fine-tuning-inkling-2-mini) | An evaluated adapter |
 | Understand how training works | [From scratch](#train-a-small-model-from-scratch) | A small educational language model |
-| Use the existing scripts | [Repository tools](#repository-tools-and-limits) | Helpers with known limits |
+| Understand the repository | [Repository scope](#repository-scope) | Files, examples and limits |
 
 ## Key terms
 
@@ -97,7 +97,7 @@ git clone https://github.com/jellydn/tiny-local-ai.git
 cd tiny-local-ai
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install huggingface_hub openai
+python -m pip install huggingface_hub
 mkdir -p models/inkling-2-mini runtime
 ```
 
@@ -144,22 +144,13 @@ curl http://127.0.0.1:8000/v1/chat/completions \
 
 Check that the model ID appears and the answer is readable. Loading successfully is only the first check. Also test arithmetic, your language, long input, and any tool use you need.
 
-The existing client can call this endpoint:
-
-```bash
-source .venv/bin/activate
-python scripts/llm-client.py \
-  --url http://127.0.0.1:8000/v1 --model inkling-2-mini \
-  "Write a short Python function that adds two numbers."
-```
-
-Use explicit URL and model arguments. The current client writes a config file but does not load it in `main()`. It also does not pass the server guide's full sampling settings; use the direct API when you need controlled comparisons.
+Use the direct API example above for requests. Set the model field to an ID returned by `/v1/models`.
 
 ### Optional: access from another computer
 
 Keep `127.0.0.1` for use on the server computer. For a trusted LAN, change the server bind address to `0.0.0.0`, then use the server's private IP in the client URL, such as `http://192.168.1.100:8000/v1`.
 
-The example has no authentication. Do not forward this port to the internet. The bundled client uses a placeholder API key; use a suitable authenticated client if you add server authentication. Local inference can run offline after required files are downloaded, but downloads, remote URLs and cloud training still use the network.
+The example has no authentication. Do not forward this port to the internet. If you add server authentication, send the required credentials with each API request. Local inference can run offline after required files are downloaded, but downloads, remote URLs and cloud training still use the network.
 
 ## Before you train
 
@@ -249,23 +240,18 @@ Runtime depends on your computer. This produces a small text predictor, not an i
 
 Then change one variable at a time: model width, context, training steps or dataset. Compare training and validation loss. If training loss falls while validation loss rises, investigate overfitting. Save the configuration, dataset source, seed and checkpoint so you can repeat the experiment.
 
-## Repository tools and limits
+## Repository scope
 
-The repository remains a script collection. This README adds a learning path; it does not add training code.
-
-| Path | Purpose and limits |
+| File | Purpose |
 | --- | --- |
-| `scripts/start-llm.sh` | General GGUF launcher. Requires a compatible binary and cached weights. Uses memory-based context defaults and a fixed `llm-server` tmux session. It does not apply the Mini recipe above. |
-| `scripts/download-model.sh` | Existing download helper. Use the explicit Mini file download above for this guide. |
-| `scripts/llm-client.py` | OpenAI-compatible text client. Use explicit URL and model arguments. |
-| `scripts/serve-dashboard.py` | Optional dashboard; not a Mini training or validation tool. |
-| `scripts/doctor.py`, `data/` | Hardware and model recommendation helpers. Their data is guidance, not proof of current Mini support. |
-| `scripts/router.py`, `scripts/start-llm-router.sh` | Existing model-routing helpers; no Mini-specific routing is established here. |
-| `scripts/start-llm-optimized.sh`, `scripts/start-dual-servers.sh` | Existing model-specific launch helpers. Review settings before use. |
-| `swap`, `scripts/swap-model.py` | Existing switching workflow. Do not assume it manages the manual server in this guide. |
-| `scripts/benchmark*.sh`, `scripts/benchmark.py` | Benchmark helpers; results depend on model, prompt and settings. |
-| [BENCHMARK.md](BENCHMARK.md), [OPTIMIZATION.md](OPTIMIZATION.md), [benchmark quick start](BENCHMARK-QUICK-START.txt) | Earlier setup notes. Treat model-specific settings and measurements as historical context. |
-| [LICENSE](LICENSE) | Repository licence. Model weights and datasets have their own terms. |
+| [README.md](README.md) | Beginner handbook, setup examples and learning resources |
+| [AGENTS.md](AGENTS.md) | Guidance for maintaining this handbook |
+| [.gitignore](.gitignore) | Excludes local downloads, environments and experiment output |
+| [LICENSE](LICENSE) | Repository licence; model weights and datasets have their own terms |
+
+Run inference with the external runtime described above. Run the educational training exercise in its separate nanoGPT checkout.
+
+The earlier launchers, routing tools, hardware data and Qwen/GLM benchmark notes were removed to keep the repository consistent with this handbook. They remain in [Git history before the cleanup](https://github.com/jellydn/tiny-local-ai/tree/84e52cbbd8359dbef8a2251c989e10a6177fcafe). Treat those files as historical material.
 
 ## Troubleshooting
 
@@ -274,7 +260,7 @@ The repository remains a script collection. This README adds a learning path; it
 | Unknown architecture, load error or nonsense output | Runtime version and GGUF layout must match. A successful file download does not prove compatibility. |
 | Out of memory | Close other apps, reduce context and concurrency, then try a smaller quant. Check runtime buffers as well as weights. |
 | Slow first response | Separate model load, prompt processing and token generation time. Long prompts can dominate latency. |
-| Client connects to the wrong model | Pass `--url` and `--model` explicitly; inspect `/v1/models`. |
+| API request reaches the wrong model | Check the endpoint URL and the JSON `model` field; inspect `/v1/models`. |
 | LAN client cannot connect | Check server bind address, private IP and firewall. Confirm local access first. |
 | Fine-tune is worse than the base model | Check data quality, leakage, formatting, learning rate and evaluation settings. |
 | Adapter cannot be served locally | Check exact base revision, tokenizer, adapter format and runtime support before merging or conversion. |
@@ -283,7 +269,7 @@ The repository remains a script collection. This README adds a learning path; it
 
 For each experiment, save the model ID and revision, quant filename and checksum, runtime version, OS, hardware, context, sampling, prompt, output, memory use and timing. Label results as measured, source-reported or estimated.
 
-This README was checked against the repository files and linked sources. The inference commands and training exercise were not executed as part of this documentation update. There is no formal repository test suite, and no blanket claim that every feature or hardware configuration has been tested.
+This README was checked against the repository files and linked sources. The inference commands and training exercise were not executed as part of this documentation update. This documentation repository has no build or application test suite. Check file links, section links and example consistency when changing the handbook. Hardware and model support must be tested separately.
 
 ## Resources
 
