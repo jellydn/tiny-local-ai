@@ -15,6 +15,7 @@ This repository is a documentation handbook. It contains setup examples and link
 | Add your documents | [Prompting and retrieval](#before-you-train) | Answers with relevant source text |
 | Change response style or task behaviour | [Fine-tuning](#fine-tuning-inkling-2-mini) | An evaluated adapter |
 | Understand how training works | [From scratch](#train-a-small-model-from-scratch) | A small educational language model |
+| Learn from measured runs | [Hands-on notes](#hands-on-learning-notes) | Benchmarks and practical lessons |
 | Understand the repository | [Repository scope](#repository-scope) | Files, examples and limits |
 
 ## Key terms
@@ -77,6 +78,38 @@ Leave disk space for downloads, temporary files and checkpoints. Start with one 
 - The default F16 KV setup ran out of memory. DSpark was slower in the reported comparison.
 
 The PR was **open when checked**. These are author-reported measurements from that setup, not a speed guarantee or a benchmark run performed by this handbook. Use its pinned launch and evidence for reproduction. Its 128K configuration is not Mini's maximum model context.
+
+## Hands-on learning notes
+
+Read the full experiments in [Inkling 2 Mini on M1 Max](https://github.com/jellydn/tiny-local-ai/discussions/3) and [Qwen3.8-27B on the same Mac](https://github.com/jellydn/tiny-local-ai/discussions/4). Their supporting submissions are [sybil-solutions/local-ai-registry PR #466](https://github.com/sybil-solutions/local-ai-registry/pull/466) and [sybil-solutions/local-ai-registry PR #470](https://github.com/sybil-solutions/local-ai-registry/pull/470).
+
+These are **author-reported results**, checked against the linked reports on 21 November 2026. The benchmarks were not rerun for this handbook. Both setups used an M1 Max with a 32-core GPU, 32 GB memory, Metal, Unsloth `b12588-mix-c0c3de8`, `UD-Q4_K_XL`, one request slot and 131,072 configured context tokens. Sampling and speculation settings differ by model, so this is a comparison of tuned setups, not a test with only one variable changed.
+
+### What the measurements show
+
+**Prefill** processes the prompt before generation. **Decode** generates output tokens. **Speculative decoding** drafts tokens, then checks them with the main model. **MTP** means multi-token prediction; Qwen's tested setup uses its built-in prediction head.
+
+| Reported metric | Inkling 2 Mini | Qwen3.8-27B |
+| --- | --- | --- |
+| Decode benchmark, median of six samples | About 20.5 tokens/s without DSpark | About 14.8–15.0 tokens/s with three MTP drafts; about 11.9 without MTP |
+| Separate lab speed gate | 20.1 tokens/s | 17.6 tokens/s |
+| Prompt processing, short / longer prompt | 202.6 at 3.3K / 146.5 at 25.5K tokens/s | 124.1 at 2.8K / 116.6 at 21.6K tokens/s |
+| Total Metal buffers at the tested 128K settings | 23,326 MiB | 20,954 MiB |
+| Successful recall prompt length | 91,890 tokens | 106,294 tokens |
+| Speculation result on this setup | DSpark reduced decode speed | Three MTP drafts improved decode against nearby controls |
+
+The prompt lengths differ. Recall success is one task, not proof of quality across the full context window. The lab speed gate and the repeated benchmark use different prompts and measurement methods; keep their figures separate. Tokens/s also does not measure answer quality or total time to finish a task.
+
+### Lessons to apply to your own experiments
+
+1. **Check the GPU memory budget.** Add the model, KV cache and compute buffers from the server log. On this Mac, Mini's default 128K launch ran out of memory. Micro-batch 256 and Q8 KV cache made the reported launch fit. Cache quantization can affect quality, so test it on your tasks.
+2. **Separate cache size from total memory.** The reports list Qwen's Q8 KV cache as 4,352 MiB and Mini's as 2,282 MiB. Qwen still has lower total Metal buffers because other buffers are smaller. Do not assume that a smaller total means every component is smaller.
+3. **Measure speculation on the exact backend.** Draft acceptance alone is not enough: verification must save more work than drafting adds. These tests found a gain with Qwen MTP and a loss with Mini DSpark. This does not establish a rule for every dense model, MoE model, GPU or future runtime.
+4. **Measure prompt processing and generation separately.** Mini was faster in the listed prompt-processing tests. Qwen's rate changed less between its two tested lengths. Test your own prompt lengths before choosing a model for long documents.
+5. **Use a baseline before and after each change.** A busy laptop can slow down during a long session. Run baseline → candidate → baseline, repeat samples and report the median. Keep prompts and sampling fixed within each comparison.
+6. **Keep the complete recipe.** Record weight revision, file checksum, runtime build, launch flags and test prompts. The same model name can refer to files with different formats or runtime requirements.
+
+For a first experiment, use the short-context Mini setup below. Move to the linked 128K recipe only after the basic setup works. These notes concern inference; they do not establish local fine-tuning requirements.
 
 ## Run Inkling 2 Mini
 
