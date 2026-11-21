@@ -1,712 +1,297 @@
 # Tiny Local AI
 
-> Run local LLM on MacBook A, access from MacBook B over LAN
+A beginner handbook for running AI on your own computer, with **Inkling 2 Mini** as the main example. Learn to run a model, select hardware, test results, fine-tune for a task, and train a small model for education.
 
-[![GitHub stars](https://img.shields.io/github/stars/jellydn/tiny-local-ai)](https://github.com/jellydn/tiny-local-ai/stargazers)
-[![GitHub license](https://img.shields.io/github/license/jellydn/tiny-local-ai)](https://github.com/jellydn/tiny-local-ai/blob/main/LICENSE)
+This repository contains Bash and Python tools for local inference. It does not contain Inkling weights, a Mini training pipeline, or a recipe to reproduce its pretraining.
 
-## Features
+**Sources checked: 21 November 2026.** Model support changes quickly. Check the linked runtime guide before downloading large files.
 
-- **Metal / CUDA Acceleration** - GPU-offloaded inference on Apple Silicon and NVIDIA
-- **LAN Access** - OpenAI-compatible API accessible from other machines
-- **Dual-Mac Setup** - Server on MacBook A, client on MacBook B
-- **Web Dashboard** - Monitor server status
-- **Auto Hardware Detection** - Powered by [canirun.ai](https://www.canirun.ai/) - supports Apple Silicon M1-M5 and NVIDIA RTX/GTX
-- **Model Recommendations** - Dynamic model suggestions based on your hardware
-- **Model Agnostic** - Supports any GGUF model
+## Choose your starting point
 
-## Prerequisites
+| Your goal | Start here | Result |
+| --- | --- | --- |
+| Chat with a local model | [Run Inkling 2 Mini](#run-inkling-2-mini) | A local web page and API |
+| Check whether your computer can run it | [Hardware](#hardware-and-memory) | A memory plan |
+| Add your documents | [Prompting and retrieval](#before-you-train) | Answers with relevant source text |
+| Change response style or task behaviour | [Fine-tuning](#fine-tuning-inkling-2-mini) | An evaluated adapter |
+| Understand how training works | [From scratch](#train-a-small-model-from-scratch) | A small educational language model |
+| Use the existing scripts | [Repository tools](#repository-tools-and-limits) | Helpers with known limits |
 
-- **llama.cpp** with Metal support - [Build from source](https://github.com/ggerganov/llama.cpp) or download from [releases](https://github.com/ggerganov/llama.cpp/releases)
-- **Python 3.10+** - For CLI client and dashboard
-- **GGUF model** - Download from [Unsloth.ai](https://unsloth.ai/)
+## Key terms
 
-## Quick Start
+- **Inference:** Run existing model weights to generate an answer.
+- **Token:** A unit of text processed by the model. It can be part of a word.
+- **Weights:** The numbers learned during training.
+- **Context:** The input and generated tokens available to a request.
+- **Quantization:** Store weights with fewer bits to reduce memory use. Quality can change.
+- **GGUF:** A model file format used by llama.cpp and compatible runtimes.
+- **KV cache:** Runtime memory used to retain attention information.
+- **Fine-tuning:** Update an existing model with task examples.
+- **LoRA:** Train small adapter weights while keeping most base weights fixed.
+- **Pretraining from scratch:** Start with random weights and learn to predict tokens.
+- **RAG:** Retrieve relevant documents and include them in the prompt. It does not change weights.
 
-### 1. Download llama.cpp
+## Meet Inkling 2 Mini
 
-```bash
-git clone https://github.com/ggerganov/llama.cpp
-cd llama.cpp
-make LLAMA_METAL=1
-```
+Thinking Machines Lab released Mini on 20 November 2026 under Apache 2.0. It accepts text and images and produces text. It has 26.4B total parameters and 3.4B active parameters. Repeated layer passes give about 5.4B effective active parameters per token.
 
-### 2. Download a Model
+Its 24 layers include 12 middle layers that run three times with shared weights. This looped MoE architecture needs explicit runtime support. Active parameter count is not the amount of memory needed to store the model.
 
-Get GGUF models from HuggingFace (Recommended):
+The official card specifies up to 1M context tokens and an approximately 20 GB mixed NVFP4/MXFP8 checkpoint. A local machine may support much less context. See the [official model card and weights](https://huggingface.co/thinkingmachines/Inkling-2-Mini) for architecture, limitations, training information and licence details.
 
-```bash
-# Get hardware-specific recommendations
-./scripts/download-model.sh --suggest
+### Mini and Small are different models
 
-# List all available quantizations for a model
-./scripts/download-model.sh --list unsloth/Qwen3-Coder-Next-GGUF
+| Model | Total / active parameters | Role in this handbook |
+| --- | --- | --- |
+| Inkling 2 Mini | 26.4B / 3.4B, with repeated computation as described above | Main local inference example |
+| Inkling 2 Small | 594B / 17B | Separate, much larger model |
 
-# Download a specific quantization
-./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:Q4_K_M
+[drost-ai/finetune-inkling-2-small](https://github.com/drost-ai/finetune-inkling-2-small) is a community LoRA workflow for **Small on Tinker**, associated with Tess-4.5-594B-A17B. Its costs, hardware needs, tokenizer checks, merge steps and benchmark results are not Mini results. Read it for workflow ideas. Do not rename the model and assume its scripts support Mini.
 
-# Download with extreme quantization (80B model on 32GB)
-./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
-```
+## Hardware and memory
 
-**Models available from Unsloth.ai:**
+The [official Mini card](https://huggingface.co/thinkingmachines/Inkling-2-Mini) supports DGX Spark and Apple silicon with at least 32 GB memory. It recommends at least 32 GB VRAM for other GPUs.
 
-- [Qwen3-Coder-Next-80B](https://huggingface.co/unsloth/Qwen3-Coder-Next-GGUF) - Best for code generation
-- [GLM-4.7-Flash](https://huggingface.co/unsloth/GLM-4.7-Flash-GGUF) - Balances performance and efficiency
-- [MiniMax-M2.5](https://huggingface.co/unsloth/MiniMax-M2.5-GGUF) - Best reasoning, compact
+Use this practical planning guide:
 
-**Recommended Models by Hardware:**
+| Machine | Suggested first step |
+| --- | --- |
+| Apple silicon, 32 GB or more | Try the text-only setup below with a short context |
+| NVIDIA or AMD GPU | Select the matching build in the linked runtime guide; check model and backend support |
+| 8–16 GB laptop | Start with a smaller model, or investigate smaller Mini quants and their quality trade-offs |
+| CPU-only computer | Use a tiny educational model first; measure speed before committing to larger downloads |
+| Computer for training | Check the training framework separately; inference fit does not prove training fit |
 
-For the most up-to-date recommendations, run the hardware doctor:
+Budget memory for **weights + KV cache + runtime buffers + the operating system and other apps**. Image processing adds memory. More context and concurrent requests can increase memory use. Unified memory and discrete GPU VRAM have different constraints.
 
-```bash
-python3 scripts/doctor.py
-```
+Leave disk space for downloads, temporary files and checkpoints. Start with one request and a short context. Increase one setting at a time. A file that fits on disk may still fail to load.
 
-Or visit [canirun.ai](https://www.canirun.ai/) directly.
+### A measured M1 Max example
 
-| Hardware           | Model                    | Quant        | Size   | Speed       |
-| ------------------ | ------------------------ | ------------ | ------ | ----------- |
-| M3/M4 Max 36-128GB | MiniMax-M2.5             | Q4_K_M       | ~120G  | 5-10 tok/s  |
-| M2/M3 Max 32GB     | Qwen3-Coder-Next         | UD-IQ1_S     | ~21.5G | 4-8 tok/s   |
-| M2/M3 Max 32GB     | GLM-4.7-Flash            | Q4_K_M       | ~18G   | 15-25 tok/s |
-| M1/M2 Pro 16GB     | Qwen3-8B                 | Q4_K_M       | ~5G    | 15-25 tok/s |
-| M1/M2/M3/M4 8-16GB | Gemma-3-4B               | Q4_K_M       | ~2.7G  | 20-35 tok/s |
-| RTX 4090 (24GB)    | Qwen3-Coder-Next         | Q4_K_M       | ~48G   | 15-25 tok/s |
-| RTX 4080 (16GB)    | GLM-4.7-Flash            | Q4_K_M       | ~18G   | 20-35 tok/s |
+[jellydn's sybil-solutions/local-ai-registry PR #466](https://github.com/sybil-solutions/local-ai-registry/pull/466) reports a text-only run on an M1 Max with a 32-core GPU and 32 GB memory:
 
-**New Discovery: 80B Models Now Viable! 🎉**
+- Unsloth `b12588-mix-c0c3de8`, Metal, `UD-Q4_K_XL`.
+- 131,072 configured context tokens, one slot, micro-batch 256, Q8 KV cache and flash attention.
+- Six lab gates passed; reported decode was 20.1 tokens/second.
+- A 91,890-token recall prompt passed. This is not a test of every token in the configured window.
+- The default F16 KV setup ran out of memory. DSpark was slower in the reported comparison.
 
-With extreme quantizations (1-2 bit), even large 80B models fit on 32GB:
+The PR was **open when checked**. These are author-reported measurements from that setup, not a speed guarantee or a benchmark run performed by this handbook. Use its pinned launch and evidence for reproduction. Its 128K configuration is not Mini's maximum model context.
 
-- **UD-IQ1_S** (~21.5GB): 1-bit quantization, good quality at extreme compression
-- **UD-TQ1_0** (~18.9GB): 1-bit, slightly smaller than IQ1_S
-- **UD-IQ1_M** (~24.2GB): 2-bit, tight fit but higher quality
+## Run Inkling 2 Mini
 
-Example (Qwen3-Coder-Next-80B on M1 Max):
+### 1. Select a matching runtime and GGUF
 
-```bash
-./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
-./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
-```
+Use the [Unsloth Mini guide](https://unsloth.ai/docs/models/inkling-2-mini) and [GGUF repository](https://huggingface.co/unsloth/Inkling-2-Mini-GGUF).
 
-**What to Avoid:**
+**Compatibility matters:** root GGUFs use Unsloth's layout and its `b12588-mix-c0c3de8` build. For upstream llama.cpp, use [Mainline_Support and its README](https://huggingface.co/unsloth/Inkling-2-Mini-GGUF/blob/main/Mainline_Support/README.md). Do not mix the two paths.
 
-- ❌ Q4_K_M with 80B models on 32GB (~48GB required)
-- ❌ 70B-80B models with Q5_K_M or larger quantizations
-- ✅ Use 32B-14B models for best quality/speed trade-off
-- ✅ Use extreme quantizations (UD-IQ1_S) only if you need large model reasoning and can tolerate 2-4 tok/sec
+For a graphical start, use the guide's Unsloth Desktop steps. The terminal example below uses the pinned Unsloth build, text only, without a drafter. It is a documented starting configuration, not a local hardware test.
 
-#### Custom Cache Location
+### 2. Prepare the folder
 
-Set `HF_HOME` to change where models are cached (default: `~/Library/Caches/llama.cpp`):
+Prerequisites: Git, Python 3.10+, tmux, and the compatible runtime.
 
 ```bash
-export HF_HOME=/your/custom/path
-./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:Q4_K_M
+git clone https://github.com/jellydn/tiny-local-ai.git
+cd tiny-local-ai
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install huggingface_hub openai
+mkdir -p models/inkling-2-mini runtime
 ```
 
-### 3. Start Server (MacBook A)
+Download the archive for your OS and GPU from the [pinned runtime release](https://github.com/unslothai/llama.cpp/releases/tag/b12588-mix-c0c3de8). Extract it into `runtime/`. Locate `llama-server` and keep its libraries with it. The commands below assume `runtime/llama-server`; adjust that path if the archive has another folder level.
+
+### 3. Download the text model
+
+The recommended `UD-Q4_K_XL` file is about 17.63 GB. This is the weight download, not total memory use.
 
 ```bash
-# Basic usage
-./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
-
-# Or with custom model path
-MODEL_NAME=my-model ./scripts/start-llm.sh
+hf download unsloth/Inkling-2-Mini-GGUF \
+  Inkling-2-Mini-UD-Q4_K_XL.gguf \
+  --local-dir models/inkling-2-mini
 ```
 
-### 4. Use Client (MacBook B)
+Record the Hugging Face revision and file checksum for repeatable tests. For a historical reproduction, use the revision and checksums in sybil-solutions/local-ai-registry PR #466.
+
+### 4. Start a text-only server
+
+Run from the repository root. This starts with 4K context to limit the first test's memory use.
 
 ```bash
-# Install client dependency
-pip install openai
-
-export LLM_SERVER_URL=http://192.168.1.x:8000/v1
-# Send a prompt
-python scripts/llm-client.py "Write a Python function to calculate fibonacci"
-
-# Or with streaming
-python scripts/llm-client.py -s "Tell me a story"
+SESSION="$(basename "$PWD")"
+tmux new-session -d -s "$SESSION"
+tmux send-keys -t "$SESSION" './runtime/llama-server --model models/inkling-2-mini/Inkling-2-Mini-UD-Q4_K_XL.gguf --alias inkling-2-mini --jinja --ctx-size 4096 --n-gpu-layers 99 --parallel 1 --temp 1.0 --top-p 1.0 --top-k 0 --min-p 0.0 --host 127.0.0.1 --port 8000' Enter
+tmux capture-pane -p -t "$SESSION" -S -30
 ```
 
-## Architecture
+If the session already exists, use a new pane in it before sending the command. Wait for the server's ready message. Open [the local chat page](http://127.0.0.1:8000). To stop this server, attach with `tmux attach -t "$SESSION"` and press Ctrl-C.
 
-```
-┌─────────────────────┐         ┌─────────────────────┐
-│   MacBook A         │         │   MacBook B         │
-│   (Server)          │   LAN   │   (Client)         │
-│                     │         │                     │
-│  ┌───────────────┐  │         │  ┌───────────────┐  │
-│  │ llama-server	 │◄─┼─────────┼─►│ llm-client.py │  │
-│  │ :8000/v1      │  │         │  │ or curl       │  │
-│  │ Metal GPU     │  │         │  │               │  │
-│  └───────────────┘  │         │  └───────────────┘  │
-└─────────────────────┘         └─────────────────────┘
-```
+For image input, follow the guide's matching projector instructions. Enable optional drafting only after you have measured the basic setup.
 
-## Scripts
+### 5. Test the API
 
-| Script                   | Description                                           |
-| ------------------------ | ----------------------------------------------------- |
-| `fetch-canirun-data.sh`  | Fetch latest hardware/model data from canirun.ai      |
-| `download-model.sh`      | Download GGUF models from HuggingFace                 |
-| `start-llm.sh`           | Start LLM server with auto hardware detection         |
-| `start-llm-router.sh`    | Auto-detect and start with optimal model              |
-| `start-llm-optimized.sh` | Start with optimized parameters by model              |
-| `stop-llm.sh`            | Stop the LLM server                                   |
-| `list-models.sh`         | List available cached models with sizes               |
-| `benchmark-startup.sh`   | Measure model startup times across iterations         |
-| `llm-client.py`          | CLI client for interacting with the server            |
-| `serve-dashboard.py`     | Web dashboard to monitor server status                |
-| `doctor.py`              | Hardware detection & model recommendations (canirun.ai) |
-| `router.py`              | Smart routing CLI with task-type detection            |
-| `swap-completion.bash`   | Bash shell completion for swap command                |
-| `swap-completion.zsh`    | Zsh shell completion for swap command                 |
-
-## Hardware Doctor
-
-Powered by [canirun.ai](https://www.canirun.ai/) hardware database. Auto-detects Apple Silicon (M1-M5) and NVIDIA GPUs (RTX 50/40/30, GTX), then recommends optimal models and quantizations.
+In a second terminal:
 
 ```bash
-python3 scripts/doctor.py
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/v1/models
+curl http://127.0.0.1:8000/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"inkling-2-mini","messages":[{"role":"user","content":"Explain local AI in three short sentences."}],"max_tokens":256,"temperature":1.0}'
 ```
 
-Output:
+Check that the model ID appears and the answer is readable. Loading successfully is only the first check. Also test arithmetic, your language, long input, and any tool use you need.
 
-```
-============================================================
-  Tiny Local AI - Hardware Doctor
-  Powered by canirun.ai
-============================================================
-
-============================================================
-  DETECTED HARDWARE
-============================================================
-  Chip:                 Apple M1 Max
-  Variant:              max
-  CPU Cores:            10
-  GPU Cores:            24
-  RAM:                  32 GB
-  RAM Available:        28 GB
-  Metal Support:        Yes
-
-============================================================
-  RECOMMENDED MODELS (via canirun.ai)
-============================================================
-  #    Model                     Size     Quant        tok/s   Type
-  ---- ------------------------- -------- ------------ ------- ------------
-  1    GLM-4.7-Flash             16.3     UD-Q4_K_XL  41      general
-  2    DeepSeek-Coder-V2         8.0      Q4_K_M      35      coding
-  3    Qwen3-8B                  5.0      Q4_K_M      25      general
-
-  Data source: https://www.canirun.ai/
-  Model source: https://unsloth.ai/
-
-============================================================
-  SYSTEM CHECK
-============================================================
-  [OK] llama-server: /opt/homebrew/bin/llama-server
-  [OK] Model cache: ~/Library/Caches/llama.cpp
-  [INFO] Cached models: 2
-```
-
-## Smart Router
-
-Automatically route prompts to optimal model based on task type:
+The existing client can call this endpoint:
 
 ```bash
-# Auto-detect and route
-python3 scripts/router.py "Write a Python function to fibonacci"
-
-# Force specific model
-python3 scripts/router.py "Hello" --model glm
-
-# With streaming
-python3 scripts/router.py "Tell me a story" --stream
-
-# Show routing statistics
-python3 scripts/router.py "prompt" --stats
+source .venv/bin/activate
+python scripts/llm-client.py \
+  --url http://127.0.0.1:8000/v1 --model inkling-2-mini \
+  "Write a short Python function that adds two numbers."
 ```
 
-### Task Detection
+Use explicit URL and model arguments. The current client writes a config file but does not load it in `main()`. It also does not pass the server guide's full sampling settings; use the direct API when you need controlled comparisons.
 
-The router automatically detects:
+### Optional: access from another computer
 
-- **Coding tasks**: Keywords like `function`, `class`, `debug`, `api`, etc.
-- **General tasks**: Everything else
+Keep `127.0.0.1` for use on the server computer. For a trusted LAN, change the server bind address to `0.0.0.0`, then use the server's private IP in the client URL, such as `http://192.168.1.100:8000/v1`.
 
-Routing logic:
+The example has no authentication. Do not forward this port to the internet. The bundled client uses a placeholder API key; use a suitable authenticated client if you add server authentication. Local inference can run offline after required files are downloaded, but downloads, remote URLs and cloud training still use the network.
 
-- **Coding prompts** → Qwen3-Coder-Next (concise, structured)
-- **General prompts** → GLM-4.7-Flash (fast, detailed)
+## Before you train
 
-### Dual Server Mode
+Choose the smallest change that solves your problem:
 
-For 64GB+ RAM, run both models simultaneously:
+| Problem | First approach |
+| --- | --- |
+| The answer needs clearer instructions | Improve the prompt and provide examples |
+| The answer needs current or private documents | Use retrieval and include relevant passages |
+| The output needs a repeated format or specialised behaviour | Evaluate supervised fine-tuning |
+| You want to learn how models work | Train a tiny model from scratch |
+
+Create a baseline before any training. Keep 20–50 representative test prompts and expected checks. Include failure cases. Keep test examples out of training data. Record quality, latency, memory and output length.
+
+## Fine-tuning Inkling 2 Mini
+
+### Official hosted path: Tinker
+
+The [official Tinker Cookbook](https://github.com/thinking-machines-lab/tinker-cookbook) supports `thinkingmachines/Inkling-2-Mini` through its model-specific renderer and tokenizer. It provides supervised learning and other post-training examples.
+
+Tinker runs training remotely through an API. It is not training on your laptop. Check current access, model limits and pricing before a run. Use the cookbook's Mini model name and rendering path, rather than copying a Small recipe.
+
+A beginner workflow:
+
+1. Define one measurable task, such as producing a fixed support-ticket format.
+2. Prepare a small, clean dataset. Remove secrets and duplicates. Confirm that you can use the data.
+3. Separate training, validation and final test sets by source or topic to reduce leakage.
+4. Render and count tokens with the tokenizer for the exact model. Check the service's input and output limits.
+5. Run a small supervised LoRA experiment with a capped budget.
+6. Compare the base model and adapter on the same held-out prompts and sampling settings.
+7. Keep the adapter only if task quality improves without unacceptable regressions.
+8. Verify export, merge and runtime compatibility before planning local deployment.
+
+Conceptual JSONL record; the trainer's loader must support this schema:
+
+```json
+{"messages":[{"role":"user","content":"Classify: The package arrived damaged."},{"role":"assistant","content":"delivery_damage"}]}
+```
+
+Start with short, correct examples. Do not add private data to a hosted service without the required permission.
+
+### Local fine-tuning
+
+This repository has **no verified local Mini fine-tuning recipe**. A GGUF inference file is not a ready training checkpoint. Mini's looped layers, MoE modules and mixed precision require explicit trainer support.
+
+Before training locally, confirm the exact architecture, checkpoint format, adapter targets, backward-pass support, memory needs and export path. Prove that a tiny run can save, reload and improve a held-out task. Do not infer training requirements from the 17.63 GB inference file.
+
+For general adapter concepts, see [Hugging Face PEFT](https://github.com/huggingface/peft) and [TRL](https://github.com/huggingface/trl). These are learning resources, not a claim of Mini compatibility. Learn the full workflow on a smaller model that your selected trainer explicitly supports if Mini support is incomplete.
+
+Full fine-tuning updates all weights and usually needs much more memory than adapter training. Reinforcement learning adds reward design and evaluation complexity. Learn supervised fine-tuning first.
+
+## Train a small model from scratch
+
+**Educational goal:** Learn tokenization, next-token prediction, loss, gradients, validation and sampling. Reproducing Inkling 2 Mini needs far more data, compute and engineering than this exercise. Open weights do not provide a complete reproduction recipe.
+
+Suggested learning order:
+
+1. [Neural Networks: Zero to Hero](https://github.com/karpathy/nn-zero-to-hero) — work through neural-network fundamentals.
+2. [nanoGPT](https://github.com/karpathy/nanoGPT) — inspect and train a small GPT. Use it as a compact educational example.
+3. [llm.c](https://github.com/karpathy/llm.c) — study lower-level training implementation after the Python workflow.
+
+### First experiment: character-level Shakespeare
+
+This follows nanoGPT's CPU example. Use a separate directory and environment. Run training and sampling in tmux.
 
 ```bash
-./scripts/start-dual-servers.sh
-# Starts Qwen on port 8000, GLM on port 8001
+git clone https://github.com/karpathy/nanoGPT.git
+cd nanoGPT
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install torch numpy transformers datasets tiktoken wandb tqdm
+python data/shakespeare_char/prepare.py
 
-# Then use router
-python3 scripts/router.py "your prompt"
+SESSION="$(basename "$PWD")"
+tmux new-session -d -s "$SESSION"
+tmux send-keys -t "$SESSION" 'python train.py config/train_shakespeare_char.py --device=cpu --compile=False --eval_iters=20 --log_interval=1 --block_size=64 --batch_size=12 --n_layer=4 --n_head=4 --n_embd=128 --max_iters=2000 --lr_decay_iters=2000 --dropout=0.0' Enter
+tmux attach -t "$SESSION"
 ```
 
-## Model Hot-Swap
-
-Quickly switch between models on a single server:
+Wait for training to finish. In that tmux shell, generate a sample:
 
 ```bash
-# Check current status
-./swap status
-
-# Swap to Qwen
-./swap qwen
-
-# Swap to GLM
-./swap glm
-
-# Or use Python directly
-python3 scripts/swap-model.py status
-python3 scripts/swap-model.py qwen
-python3 scripts/swap-model.py glm
-
-# Swap with custom timeout (for slow loading)
-./swap qwen --wait 120
-
-# Verbose output
-./swap glm --verbose
+python sample.py --out_dir=out-shakespeare-char --device=cpu
 ```
 
-The hot-swap automatically:
-
-1. Detects current model and server status
-2. Validates server is running (with process-level fallback detection)
-3. Stops old server gracefully
-4. Starts new model with optimized parameters
-5. Waits for server to be ready (with progress output)
-6. Confirms success with new model name
-
-### Robust Server Detection
-
-The swap mechanism uses multi-level detection to reliably identify server status:
-
-- **API Health Check**: Validates JSON response structure from `/health` endpoint
-- **Retry Logic**: 3 attempts with 1-second backoff for slow API responses
-- **Process-Level Fallback**: Uses `pgrep` to detect llama-server process when API isn't ready yet
-- **Extended Timeout**: 90 seconds default (customizable with `--wait`)
-- **Progress Feedback**: Shows "⏳ Starting..." status during model load
-
-## Server Startup Patterns
-
-The `start-llm.sh` script supports multiple ways to specify models with automatic discovery:
-
-### Pattern 1: Simple Model Name (Case-Insensitive)
-
-```bash
-./scripts/start-llm.sh qwen3-coder-next
-```
-
-- Searches `~/models` first (for local GGUF files)
-- Fallback to cache directory `~/Library/Caches/llama.cpp` (HuggingFace cache)
-- Case-insensitive matching: `qwen3-coder-next` → `unsloth_Qwen3-Coder-Next-GGUF_UD-IQ1_S.gguf`
-- Best for: Quick prototyping, aliases
-
-### Pattern 2: HuggingFace Repository Reference
-
-```bash
-./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF
-```
-
-- Auto-downloads if not cached (first run may take 10+ minutes)
-- Uses latest quantization in cache, or downloads latest from HuggingFace
-- Searches multiple cache locations automatically
-- Best for: Reproducibility, HuggingFace integration
-
-### Pattern 3: HuggingFace with Specific Quantization
-
-```bash
-./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-IQ1_S
-./scripts/start-llm.sh unsloth/GLM-4.7-Flash-GGUF:Q4_K_M
-```
-
-- Downloads specific quantization if not cached
-- Format: `org/model:quantization`
-- Best for: Precise control, benchmarking
-
-### Pattern 4: Full File Path
-
-```bash
-./scripts/start-llm.sh /path/to/my-model.gguf
-./scripts/start-llm.sh /Users/you/Downloads/custom-model.gguf
-```
-
-- Direct path to any GGUF file
-- No searching or downloading
-- Best for: Custom quantizations, external models
-
-### Pattern 5: Router (Auto-Start)
-
-```bash
-# No arguments - shows menu to choose from available models
-./scripts/start-llm-router.sh
-
-# Explicit model selection
-./scripts/start-llm-router.sh qwen
-./scripts/start-llm-router.sh glm
-```
-
-**Behavior:**
-
-- **No args, 2+ models**: Shows interactive menu with model sizes
-- **No args, 1 model**: Auto-selects the only available model
-- **No args, 0 models**: Error with download instructions
-- **With model name**: Starts that specific model directly
-
-Best for: One-command startup, user choice, minimal configuration
-
-### Model Discovery Behavior
-
-| Pattern     | Search Order      | Download | Auto-Find      | User Interaction  |
-| ----------- | ----------------- | -------- | -------------- | ----------------- |
-| Simple name | `~/models`, cache | ❌ No    | ✅ Yes         | None              |
-| HF repo     | Cache, then HF    | ✅ Yes   | ✅ Yes         | None              |
-| HF + quant  | Cache, then HF    | ✅ Yes   | ✅ Yes (exact) | None              |
-| Full path   | Direct            | ❌ No    | ❌ No          | None              |
-| Router      | Cache             | ❌ No    | ✅ Yes         | Menu if 2+ models |
-
-### Example Workflows
-
-#### Workflow: Quick Start with Cached Model
-
-```bash
-# Start with simple name (fastest)
-./scripts/start-llm.sh qwen3-coder-next
-
-# Check status
-./swap status
-
-# Make requests
-python scripts/llm-client.py "Write hello world in Python"
-```
-
-#### Workflow: Download and Start Specific Quantization
-
-```bash
-# Download specific quantization
-./scripts/download-model.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL
-
-# Start with HF reference
-./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL
-
-# Swap to different model
-./swap glm
-
-# Check which model is running
-./swap status
-```
-
-#### Workflow: Multi-Model Switching
-
-```bash
-# Initial startup with router
-./scripts/start-llm-router.sh
-# → Auto-selected Qwen from cache
-
-# Swap to GLM
-./swap glm
-
-# Back to Qwen
-./swap qwen
-
-# Swap with extended timeout (slow loading)
-./swap glm --wait 120
-
-# Verbose output to see what's happening
-./swap qwen --verbose
-```
-
-## Performance Benchmarking
-
-### Startup Time Benchmarking
-
-Measure how long it takes for a model to become ready:
-
-```bash
-# Benchmark a model (3 iterations, default)
-./scripts/benchmark-startup.sh qwen3-coder-next
-
-# Custom iterations
-./scripts/benchmark-startup.sh unsloth/Qwen3-Coder-Next-GGUF 5
-
-# With custom port
-PORT=8080 ./scripts/benchmark-startup.sh glm 3
-```
-
-Output example:
-
-```
-Successful starts: 3/3
-Average startup:  14250ms
-Min startup:      13847ms
-Max startup:      14890ms
-Total time:       42s
-```
-
-This helps you understand:
-
-- **Expected startup time** for your hardware
-- **Variance** across runs (useful for reliability assessment)
-- **Model comparison** - Which quantization/model loads fastest
-- **System performance** - Baseline for ML workload optimization
-
-## Configuration
-
-### Shell Completions
-
-#### Bash Completion
-
-```bash
-# Add to ~/.bash_profile or ~/.bashrc
-source /path/to/scripts/swap-completion.bash
-```
-
-Then you can use tab completion:
-
-```bash
-./swap <TAB>        # Shows: status qwen glm start stop help
-./swap qwen <TAB>   # Shows: --wait --verbose --help
-```
-
-#### Zsh Completion
-
-```bash
-# Setup zsh completions
-mkdir -p ~/.zsh/completions
-ln -s /path/to/scripts/swap-completion.zsh ~/.zsh/completions/_swap
-
-# Add to ~/.zshrc if not already there
-fpath=(~/.zsh/completions $fpath)
-autoload -Uz compinit && compinit
-```
-
-Then you can use tab completion with descriptions:
-
-```bash
-./swap <TAB>     # Shows all commands with descriptions
-./swap qwen <TAB> # Shows flags for qwen command
-```
-
-### Environment Variables
-
-```bash
-# Server URL (on client)
-export LLM_SERVER_URL=http://192.168.1.x:8000/v1
-
-# Model name (default: qwen)
-export LLM_MODEL=qwen
-
-# Models directory for local GGUF files (default: ~/models)
-export MODELS_DIR=~/models
-
-# HuggingFace cache directory (default: ~/Library/Caches/llama.cpp)
-export HF_HOME=~/custom-cache
-```
-
-### Save Default Config
-
-```bash
-python scripts/llm-client.py --config -u http://192.168.1.x:8000/v1 -m unsloth_Qwen3-Coder-Next-GGUF_UD-IQ1_S.gguf
-```
-
-## Usage Examples
-
-### Server Management
-
-```bash
-# Start with local model (existing behavior)
-./scripts/start-llm.sh qwen3-coder-next
-
-# Start with HuggingFace repo reference (auto-downloads if needed)
-./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL
-
-# Start with custom port
-PORT=8080 ./scripts/start-llm.sh qwen
-
-# Start with HuggingFace using custom cache location
-HF_HOME=/custom/cache ./scripts/start-llm.sh unsloth/Qwen3-Coder-Next-GGUF:UD-Q4_K_XL
-
-# Stop server
-./scripts/stop-llm.sh
-```
-
-### CLI Client
-
-```bash
-export LLM_SERVER_URL=http://192.168.1.x:8000/v1
-# Simple prompt
-python scripts/llm-client.py "Hello, write a hello world in Rust"
-
-# With system prompt
-python scripts/llm-client.py --system "You are a code reviewer" "Review this function"
-
-# Streaming response
-python scripts/llm-client.py -s "Count to 10"
-
-# Using curl directly
-curl http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "qwen",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
-```
-
-### Web Dashboard
-
-```bash
-# Start dashboard (default port 8080)
-python scripts/serve-dashboard.py
-
-# Custom port
-python scripts/serve-dashboard.py -p 9000
-
-# Custom server URL
-python scripts/serve-dashboard.py -u http://192.168.1.100:8000
-```
-
-## Network Setup
-
-### 1. Find Server IP
-
-```bash
-# On server MacBook
-ipconfig getifaddr en0
-```
-
-### 2. Open Firewall Port
-
-```bash
-# On server MacBook
-sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add /path/to/llama-server
-sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unockapp /path/to/llama-server
-```
-
-### 3. Static IP (Optional)
-
-Set a static IP on your server MacBook via System Settings > Network > Advanced > TCP/IP > Configure IPv4: Manually
-
-## Performance
-
-Expected performance on M1 Max 32GB:
-
-- **Throughput**: 6-12 tokens/sec
-- **Context**: Up to 32K tokens
-- **Model**: Q4_K_M or Q5_K_M quantization recommended
-
-## Security Notes
-
-- This setup does NOT include authentication by default
-- Only use on trusted local networks
-- Consider adding nginx with basic auth for production use
-
-## Related
-
-- [canirun.ai](https://www.canirun.ai/) - Hardware detection and model compatibility data
-- [my-ai-tools](https://github.com/jellydn/my-ai-tools) - My complete AI setup
-- [ai-launcher](https://github.com/jellydn/ai-launcher) - CLI tool to switch between AI assistants
-- [llama.cpp](https://github.com/ggerganov/llama.cpp) - GGML-based LLM inference
-- [Unsloth](https://unsloth.ai/) - Fast fine-tuning and GGUF conversion
-
-## Verification & Testing
-
-All features have been tested and verified on **MacBook A - M1 Max 32GB**:
-
-### ✅ Verified Functionality
-
-- [x] **Model Download**: Qwen3-Coder-Next (80B) UD-IQ1_S successfully downloaded (21.5GB)
-- [x] **Server Startup**: llama-server starts and loads model successfully
-- [x] **GPU Acceleration**: Metal acceleration enabled, all layers offloaded to GPU
-- [x] **Memory Usage**: 32.5GB RAM (full model loaded)
-- [x] **Health Endpoint**: `/health` responds correctly
-- [x] **Completions API**: `/v1/completions` generates correct responses (26-28 tok/sec)
-- [x] **Chat API**: `/v1/chat/completions` works with messages and streaming
-- [x] **Streaming**: SSE streaming works correctly
-- [x] **Python Client**: `llm-client.py` works with and without streaming
-- [x] **LAN Access**: Server accessible on `192.168.1.11:8000` from any machine
-- [x] **Code Generation**: Generated code is syntactically correct and functional
-
-### Test Examples
-
-```bash
-# API Health Check
-curl http://localhost:8000/health
-# {"status":"ok"}
-
-# Chat Completion
-curl -X POST http://localhost:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "qwen",
-    "messages": [{"role": "user", "content": "Hello"}],
-    "max_tokens": 50
-  }'
-
-# Python Client (with streaming)
-python scripts/llm-client.py -s "Write a hello world function"
-
-# From another Mac on LAN
-export LLM_SERVER_URL=http://192.168.1.11:8000/v1
-python scripts/llm-client.py "Your prompt here"
-```
-
-### Performance Benchmarks
-
-Normalized benchmark (max_tokens=512) on M1 Max 32GB:
-
-| Model            | Avg Response Time | Tokens/sec | Avg Tokens | Use Case     |
-| ---------------- | ----------------- | ---------- | ---------- | ------------ |
-| Qwen3-Coder-Next | 14.95s ± 6.54s    | 24.63      | 380        | Coding       |
-| GLM-4.7-Flash    | 11.39s ± 2.94s    | 41.19      | 468        | General/Chat |
-
-**Key Findings:**
-
-- GLM is **23.8% faster per-task** (11.39s vs 14.95s)
-- GLM is **67.2% faster per-token** (41.19 vs 24.63 tok/sec)
-- Qwen generates **19% more concise** responses (380 vs 468 tokens)
-
-Run your own benchmarks:
-
-```bash
-# Quick benchmark (5 prompts)
-python3 scripts/benchmark.py --categories coding --skip-model glm
-
-# Full benchmark (all prompts)
-python3 scripts/benchmark.py --max-tokens 512
-
-# Output JSON for analysis
-python3 scripts/benchmark.py --output results.json
-```
-
----
-
-## 👤 Author
-
-**Dung Huynh**
-
-- Website: [productsway.com](https://productsway.com)
-- YouTube: [IT Man Channel](https://www.youtube.com/@it-man)
-- GitHub: [@jellydn](https://github.com/jellydn)
-
----
-
-## ⭐ Show your support
-
-Give a ⭐️ if this project helped you!
-
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/dunghd)
-
----
-
-Made with ❤️ by [Dung Huynh](https://productsway.com)
+Runtime depends on your computer. This produces a small text predictor, not an instruction-following assistant.
+
+Then change one variable at a time: model width, context, training steps or dataset. Compare training and validation loss. If training loss falls while validation loss rises, investigate overfitting. Save the configuration, dataset source, seed and checkpoint so you can repeat the experiment.
+
+## Repository tools and limits
+
+The repository remains a script collection. This README adds a learning path; it does not add training code.
+
+| Path | Purpose and limits |
+| --- | --- |
+| `scripts/start-llm.sh` | General GGUF launcher. Requires a compatible binary and cached weights. Uses memory-based context defaults and a fixed `llm-server` tmux session. It does not apply the Mini recipe above. |
+| `scripts/download-model.sh` | Existing download helper. Use the explicit Mini file download above for this guide. |
+| `scripts/llm-client.py` | OpenAI-compatible text client. Use explicit URL and model arguments. |
+| `scripts/serve-dashboard.py` | Optional dashboard; not a Mini training or validation tool. |
+| `scripts/doctor.py`, `data/` | Hardware and model recommendation helpers. Their data is guidance, not proof of current Mini support. |
+| `scripts/router.py`, `scripts/start-llm-router.sh` | Existing model-routing helpers; no Mini-specific routing is established here. |
+| `scripts/start-llm-optimized.sh`, `scripts/start-dual-servers.sh` | Existing model-specific launch helpers. Review settings before use. |
+| `swap`, `scripts/swap-model.py` | Existing switching workflow. Do not assume it manages the manual server in this guide. |
+| `scripts/benchmark*.sh`, `scripts/benchmark.py` | Benchmark helpers; results depend on model, prompt and settings. |
+| [BENCHMARK.md](BENCHMARK.md), [OPTIMIZATION.md](OPTIMIZATION.md), [benchmark quick start](BENCHMARK-QUICK-START.txt) | Earlier setup notes. Treat model-specific settings and measurements as historical context. |
+| [LICENSE](LICENSE) | Repository licence. Model weights and datasets have their own terms. |
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Unknown architecture, load error or nonsense output | Runtime version and GGUF layout must match. A successful file download does not prove compatibility. |
+| Out of memory | Close other apps, reduce context and concurrency, then try a smaller quant. Check runtime buffers as well as weights. |
+| Slow first response | Separate model load, prompt processing and token generation time. Long prompts can dominate latency. |
+| Client connects to the wrong model | Pass `--url` and `--model` explicitly; inspect `/v1/models`. |
+| LAN client cannot connect | Check server bind address, private IP and firewall. Confirm local access first. |
+| Fine-tune is worse than the base model | Check data quality, leakage, formatting, learning rate and evaluation settings. |
+| Adapter cannot be served locally | Check exact base revision, tokenizer, adapter format and runtime support before merging or conversion. |
+
+## Record your results
+
+For each experiment, save the model ID and revision, quant filename and checksum, runtime version, OS, hardware, context, sampling, prompt, output, memory use and timing. Label results as measured, source-reported or estimated.
+
+This README was checked against the repository files and linked sources. The inference commands and training exercise were not executed as part of this documentation update. There is no formal repository test suite, and no blanket claim that every feature or hardware configuration has been tested.
+
+## Resources
+
+- [Official Inkling 2 Mini model card and weights](https://huggingface.co/thinkingmachines/Inkling-2-Mini)
+- [Official Tinker Cookbook](https://github.com/thinking-machines-lab/tinker-cookbook)
+- [Tinker documentation](https://tinker-docs.thinkingmachines.ai/)
+- [Unsloth Mini local inference guide](https://unsloth.ai/docs/models/inkling-2-mini)
+- [Unsloth Mini GGUF files](https://huggingface.co/unsloth/Inkling-2-Mini-GGUF)
+- [Upstream llama.cpp](https://github.com/ggml-org/llama.cpp)
+- [M1 Max evidence: sybil-solutions/local-ai-registry PR #466](https://github.com/sybil-solutions/local-ai-registry/pull/466)
+- [Separate Small fine-tuning workflow](https://github.com/drost-ai/finetune-inkling-2-small)
