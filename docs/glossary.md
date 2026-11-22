@@ -4,7 +4,7 @@ Each term has a short explanation and an example. The examples use the [M1 Max 3
 
 [Back to the learning base](README.md)
 
-**Jump to:** [Model basics](#model-basics) · [Model files and quantization](#model-files-and-quantization) · [Memory](#memory) · [Speed](#speed) · [Speculative decoding](#speculative-decoding) · [Engines and servers](#engines-and-servers) · [Quality](#quality)
+**Jump to:** [Model basics](#model-basics) · [Model files and quantization](#model-files-and-quantization) · [Memory](#memory) · [Speed](#speed) · [Speculative decoding](#speculative-decoding) · [Engines and servers](#engines-and-servers) · [Quality](#quality) · [Testing and sharing results](#testing-and-sharing-results)
 
 ## Model basics
 
@@ -57,13 +57,45 @@ flowchart LR
 
 Active parameters mostly decide **speed**. Total parameters decide **memory**, because every expert must be in memory: the next token may need any of them.
 
-*Example:* LFM2.5-24B-A2B has 24B total and about 2.4B active ("A2B" in the name means about 2B active). It needs memory for 24B, but it runs about as fast as a small model: 68.9 tokens per second on the M1 Max, against 15 for dense Qwen3.8-27B.
+*Example:* LFM2.5-24B-A2B has 24B total and about 2.4B active ("A2B" in the name means about 2B active). It needs memory for 24B, but it runs about as fast as a small model: 68.9 tokens per second on the M1 Max. Dense Qwen3.8-27B, with a file of almost the same size, ran at 11.9 tokens per second, or about 15 with speculative decoding. [Step 1](1-understand.md#example-two-models-with-the-same-file-size-but-different-speeds) compares the two side by side.
+
+### Thinking model
+
+A **thinking model** (or reasoning model) first writes its reasoning as tokens, then writes the answer. The reasoning also uses tokens, so a short answer can need hundreds or thousands of tokens. Give it a large enough `max_tokens` limit.
+
+*Example:* on a "write a 600-word story" test, Qwen3.8-27B wrote 15,182 tokens, mostly reasoning.
+
+### Chat template and tool calls
+
+A **chat template** is the exact text format a model expects for user and assistant messages. It is stored in the model file. A **tool call** is when the model asks your program to run a function, such as "get the weather for Paris", and then uses the result.
+
+### Layer
+
+A model is a stack of **layers**. Each layer changes the numbers that represent your text a little, then passes them to the next layer. The last layer predicts the next token. More layers usually means more work per token.
+
+### Looped layers
+
+Most models run each layer once per token. A **looped** model runs some layers several times, reusing the same weights. This gives more work per token without a bigger file.
+
+*Example:* Inkling 2 Mini stores 24 layers, but runs its middle 12 layers three times, so each token goes through 48 layer passes.
+
+### Attention
+
+**Attention** is the part of a layer that looks back at earlier tokens to decide what matters for the next one. Normal attention keeps a [KV cache](#kv-cache) entry for every earlier token.
+
+### Linear attention
+
+Normal attention keeps a [KV cache](#kv-cache) entry for every earlier token, so its memory grows with the context. **Linear attention** keeps one fixed-size summary instead. It uses less memory on long prompts, and its cost per token does not grow with the context.
+
+*Example:* in Qwen3.8-27B, 48 of 64 layers use linear attention (a type called Gated DeltaNet). Only 16 layers keep a KV cache, so its cache is small. LFM2.5-24B-A2B uses short convolution layers, which look only at a few nearby tokens and keep no KV cache, for a similar reason.
 
 ## Model files and quantization
 
 ### Quantization
 
 **Quantization** stores each weight with fewer bits. This makes the file smaller and faster to read. It also makes each weight less exact, so quality can drop a little. A common target is about 4 bits per weight instead of the original 16.
+
+A quantized model file is often called a **quant**. Its name tells you roughly how many bits each weight uses: Q8 is about 8 bits, Q4 about 4 bits, and IQ1 about 1 bit.
 
 *Analogy:* a photo saved as a smaller JPEG. It looks almost the same, but some detail is gone.
 
@@ -81,7 +113,7 @@ Active parameters mostly decide **speed**. Total parameters decide **memory**, b
 
 ### Q4_K_M
 
-**Q4_K_M** is a common llama.cpp quant type. "Q4" means mostly 4-bit weights. "K" is the k-quant method, which stores weights in small blocks with their own scales. "M" means medium: some sensitive tensors keep more bits. It averages a little under 5 bpw (estimated). It is a good default when you do not know which quant to choose.
+**Q4_K_M** is a common llama.cpp quant type. "Q4" means mostly 4-bit weights. "K" is the k-quant method, which stores weights in small blocks with their own scales. "M" means medium: some sensitive weight groups (tensors) keep more bits. It averages a little under 5 bpw (estimated). It is a good default when you do not know which quant to choose.
 
 ### UD-Q4_K_XL
 
@@ -99,7 +131,21 @@ Active parameters mostly decide **speed**. Total parameters decide **memory**, b
 
 NVFP4 needs runtime support. Mainline llama.cpp gave wrong output on the Inkling quants when checked; the Unsloth build was required. See the [worked example](worked-example-m1-max-32gb.md#why-that-build).
 
+### Projector (mmproj)
+
+A **projector** is an extra file that lets a text model read images. It turns an image into numbers the model understands. In GGUF repositories it is usually named `mmproj-….gguf`. You need it only for image input, and it uses extra memory.
+
 ## Memory
+
+### GB, GiB and MiB
+
+These units measure memory and file size, and tools mix them:
+
+- **GB** (gigabyte) = 1,000,000,000 bytes. File sizes on Hugging Face use GB.
+- **GiB** (gibibyte) = 1,073,741,824 bytes, about 7% more than 1 GB. macOS and memory tools often use GiB.
+- **MiB** (mebibyte) = 1/1,024 GiB. llama.cpp logs use MiB.
+
+*Example:* the GPU budget on the tested Mac was 25,558 MiB. That is 25.0 GiB, or about 26.8 GB. A 17.63 GB file is about 16.4 GiB.
 
 ### Context window
 
@@ -113,11 +159,13 @@ When the model reads tokens, it saves some numbers for each token so it does not
 
 > KV cache bytes ≈ 2 × layers with KV × KV heads × head size × bytes per value × context tokens
 
+The first 2 counts keys and values. **KV heads** and **head size** describe how wide each attention layer's saved data is; the model card or the server log lists them. You do not need to compute this by hand: start the server and read the KV size in its log.
+
 *Example:* LFM2.5-24B-A2B has 10 attention layers with 8 KV heads of size 64. At 128K tokens and 2 bytes per value (f16): 2 × 10 × 8 × 64 × 2 × 131,072 ≈ 2.7 GB, which is 2.5 GiB. Its other 30 layers keep no KV cache, so the cache is small.
 
-### q8_0 KV
+### f16 and q8_0 KV
 
-By default, llama.cpp stores the KV cache in **f16** (16 bits per value). **q8_0** stores it in 8 bits with a scale per block, so the cache becomes about half the size. Set it with `-ctk q8_0 -ctv q8_0`. This is a small quality trade; test it on your tasks.
+**f16** means a number stored in 16 bits. By default, llama.cpp stores the KV cache in f16. **q8_0** stores it in 8 bits with a scale per block, so the cache becomes about half the size. Set it with `-ctk q8_0 -ctv q8_0`. This is a small quality trade; test it on your tasks.
 
 *Example:* for Inkling 2 Mini at 128K, the KV cache went from 4,296 MiB (f16) to 2,282 MiB (q8_0). This change made the launch fit.
 
@@ -202,9 +250,21 @@ The **bandwidth ceiling** is the best possible decode speed: memory bandwidth ÷
 
 *Example:* the M1 Max measured 353 GB/s. Dense Qwen3.8-27B reads about 16.5 GB per token, so its ceiling is about 21 tok/s. It reached 11.9 tok/s without speculation, 57% of the ceiling.
 
+### Compute (TFLOPS)
+
+**Compute** is how much math the GPU can do. It is measured in **TFLOPS**: trillions of math operations per second. Prefill speed depends mostly on compute, and more GPU cores give more compute.
+
+*Example:* the 32-core M1 Max measured 9.5 TFLOPS. A 24-core M1 Max has less compute, so its prefill was slower (412 against 524 tok/s on a long prompt), but its decode was almost the same.
+
+### Kernel
+
+A **kernel** is a small program that runs on the GPU and does one kind of math, such as multiplying the weights by the input. An engine has many kernels. Some are well tuned for a model or a chip; others are slow. Kernels written for a new chip can fail on an older one.
+
+*Example:* Inkling 2 Mini decoded at only 25% of its bandwidth ceiling, because the Metal kernels for its looped MoE layers were not efficient. No launch setting could fix that; only better kernels can.
+
 ## Speculative decoding
 
-### Speculative decoding
+### How speculative decoding works
 
 Decode is slow because the big model makes one token per step. **Speculative decoding** lets a small, fast helper guess the next few tokens. The big model then checks all the guesses in one step and keeps the correct ones. The final text is the same as without speculation; only the speed changes.
 
@@ -218,13 +278,13 @@ flowchart LR
     E --> A
 ```
 
-It helps only when one verify step for k tokens costs much less than k normal steps. See [why DSpark was slower](worked-example-m1-max-32gb.md#why-dspark-was-slower).
+It helps only when checking several drafted tokens in one verify step costs much less than making them one by one. See [why DSpark was slower](worked-example-m1-max-32gb.md#why-dspark-was-slower).
 
 ### Draft model
 
 A **draft model** (drafter) is the small model that makes the guesses. It must use the same tokenizer as the main model.
 
-*Example:* no drafter exists for LFM2.5-24B-A2B: the small LFM2.5 models have a 65,536-token vocabulary, and this model has 128,000.
+*Example:* no drafter exists for LFM2.5-24B-A2B: the small LFM2.5 models know 65,536 different tokens (their **vocabulary**), and this model knows 128,000. A drafter must use exactly the same tokens.
 
 ### MTP (multi-token prediction)
 
@@ -240,7 +300,7 @@ A **draft model** (drafter) is the small model that makes the guesses. It must u
 
 ### DFlash2
 
-**DFlash2** is a block-diffusion drafter from z-lab. It drafts a block of tokens in one pass. When checked, the only DFlash2 checkpoint was for Qwen3.8-27B, and it ran in an MLX-VLM fork.
+**DFlash2** is a drafter from z-lab that guesses a whole block of tokens in one pass (a method called block diffusion). When checked, the only DFlash2 model file was for Qwen3.8-27B, and it ran in an MLX-VLM fork.
 
 *Example:* with block size 3, DFlash2 reached 24.3 tok/s on short prompts. With 4 or more tokens per block it fell to 2.7–6.5 tok/s on the M1.
 
@@ -255,6 +315,21 @@ The **acceptance rate** is the share of drafted tokens that the big model keeps.
 ### Engine (runtime)
 
 An **engine** is the program that loads the model file and runs it. The engine must support both the model's architecture and its file format.
+
+### Hugging Face
+
+[Hugging Face](https://huggingface.co) is a website that stores model files. A name such as `unsloth/Inkling-2-Mini-GGUF` is one repository there: `unsloth` is the owner and `Inkling-2-Mini-GGUF` is the folder. Each file page shows the file's size and its [sha256 checksum](#revision-and-checksum-sha256). The `hf` command downloads files from it.
+
+### Build, mainline and fork
+
+These words come from software projects on GitHub:
+
+- A **build** is one ready-to-run version of a program, usually named by a number, such as llama.cpp `b12588`.
+- **Mainline** (or upstream) is the official version of a project, for example llama.cpp from ggml-org.
+- A **fork** is a copy of a project that another team changes. Unsloth's llama.cpp and the Neywa-Labs mlx-vlm are forks.
+- A **pull request** (PR) is a proposed change to a project. Until it is **merged** (accepted), the official version does not have the change.
+
+*Example:* the fix for Inkling 2 Mini was in a llama.cpp pull request that was not merged yet, so mainline llama.cpp gave wrong output. Unsloth's fork already had the fix.
 
 ### llama.cpp
 
@@ -295,4 +370,28 @@ A **needle test** hides a fact, such as a 5-digit code, in a long document and a
 
 ### Sampling settings
 
-**Sampling** decides how the model picks each token from its predictions. **Temperature** controls randomness: 0 always picks the most likely token; 1.0 follows the model's probabilities. **top-p**, **top-k** and **min-p** remove unlikely tokens. Use the values from the model card, and keep them fixed when you compare.
+**Sampling** decides how the model picks each token from its predictions. **Temperature** controls randomness: 0 always picks the most likely token; 1.0 follows the model's probabilities. **top-p**, **top-k** and **min-p** remove unlikely tokens. **Repetition penalty** makes the model less likely to repeat the same words. Use the values from the model card, and keep them fixed when you compare.
+
+## Testing and sharing results
+
+### Control run
+
+A **control run** is a benchmark of your current, unchanged setup. You run it before and after you test a change (the **candidate**). If the candidate is not better than both controls, the change did not help. Controls also show whether the computer itself got slower during the test.
+
+*Example:* in the Qwen tests, the control runs got about 9% slower over 70 minutes, with no change to the setup. Without controls, that drift could look like a bad setting. See [Step 4](4-measure.md#compare-two-setups-fairly).
+
+### Plateau
+
+A setup is at a **plateau** when no change you try makes it measurably better. This is a good place to stop tuning.
+
+### Revision and checksum (sha256)
+
+A **revision** is one exact version of a model repository, named by a commit hash such as `ae9327c5…`. The same file name can change between revisions. A **checksum** is a short fingerprint of a file. **sha256** is a common checksum. If your file's sha256 matches the one on Hugging Face, you have exactly the same file, complete and unchanged.
+
+*Example:* `shasum -a 256 model.gguf` prints the checksum on a Mac.
+
+### Registry, recipe and lab gates
+
+The [Local AI registry](https://github.com/sybil-solutions/local-ai-registry) is a public list of tested setups. A **recipe** is one setup in it: a model, a file, an engine build, a launch command and a computer. Before a recipe is accepted, a test program checks it with six pass-or-fail tests called **lab gates**: it loads, it chats, it reasons, it calls a tool, it recalls a fact from a long prompt, and it reaches a minimum speed. The speed test is the **speed gate**.
+
+*Example:* the Inkling 2 Mini recipe in [sybil-solutions/local-ai-registry PR #466](https://github.com/sybil-solutions/local-ai-registry/pull/466) passed all six gates at 20.1 tok/s.

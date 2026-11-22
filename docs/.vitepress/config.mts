@@ -36,7 +36,7 @@ export default withMermaid(
 					items: [
 						{ text: "1. Understand", link: "/1-understand" },
 						{ text: "2. Plan", link: "/2-plan" },
-						{ text: "3. Do", link: "/3-do" },
+						{ text: "3. Run a model", link: "/3-run" },
 						{ text: "4. Measure", link: "/4-measure" },
 						{ text: "5. Optimise", link: "/5-optimise" },
 					],

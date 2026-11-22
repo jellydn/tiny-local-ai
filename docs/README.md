@@ -17,19 +17,19 @@ Follow the five steps in order. Each step answers one question.
 ```mermaid
 flowchart LR
     A["1. Understand<br/>What happens when<br/>a model runs?"] --> B["2. Plan<br/>Which model and file<br/>fit my computer?"]
-    B --> C["3. Do<br/>Install, download,<br/>launch, test"]
+    B --> C["3. Run a model<br/>Install, download,<br/>start, test"]
     C --> D["4. Measure<br/>How fast? How good?<br/>How much memory?"]
     D --> E["5. Optimise<br/>Change one setting,<br/>measure again"]
     E -.->|"next idea"| D
 ```
 
-| Step | Page | You will learn |
+| Step | What you do in plain words | Page |
 | --- | --- | --- |
-| 1 | [Understand](1-understand.md) | Weights, tokens, memory, and the two phases of generation |
-| 2 | [Plan](2-plan.md) | How to pick a model and a quant that fit your memory |
-| 3 | [Do](3-do.md) | How to install an engine, download a model, start a server and test it |
-| 4 | [Measure](4-measure.md) | How to measure speed, memory and answer quality fairly |
-| 5 | [Optimise](5-optimise.md) | Which settings help, which do not, and why |
+| 1. Understand | Read how a model uses memory and why it is fast or slow. No commands yet. | [Understand](1-understand.md) |
+| 2. Plan | Choose a model and a file size that fit your computer, before you download anything. | [Plan](2-plan.md) |
+| 3. Run a model | Type the commands: install the program, download the model, start it and ask it a question. | [Run a model](3-run.md) |
+| 4. Measure | Check how fast it answers, how much memory it uses and whether its answers are correct. | [Measure](4-measure.md) |
+| 5. Optimise | Change one setting at a time and keep only the changes that make it better. | [Optimise](5-optimise.md) |
 
 ## Reference pages
 

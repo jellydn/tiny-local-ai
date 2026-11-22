@@ -38,11 +38,11 @@ flowchart TB
 | Part | What it is | What makes it bigger |
 | --- | --- | --- |
 | [Weights](glossary.md#model-and-weights) | The model's numbers | More parameters, more [bits per weight](glossary.md#bits-per-weight-bpw) |
-| [KV cache](glossary.md#kv-cache) | Saved data for every token in the context | Longer context, more attention layers, f16 instead of [q8_0](glossary.md#q8_0-kv) |
+| [KV cache](glossary.md#kv-cache) | Saved data for every token in the context | Longer context, more [attention](glossary.md#attention) layers, 16-bit ([f16](glossary.md#f16-and-q8_0-kv)) instead of 8-bit (q8_0) storage |
 | [Compute buffers](glossary.md#compute-buffer) | Scratch memory for one step | Bigger [ubatch](glossary.md#batch-and-ubatch--b--ub) |
 | Operating system and apps | Everything else on the computer | Open browser tabs, editors, other servers |
 
-*Measured example:* Inkling 2 Mini at 128K context on an M1 Max used 16,332 MiB for weights, 2,282 MiB for the KV cache and 4,712 MiB for compute buffers: 23,326 MiB in total. See the [worked example](worked-example-m1-max-32gb.md#why-the-defaults-ran-out-of-memory).
+*Measured example* (units: [GB, GiB and MiB](glossary.md#gb-gib-and-mib)): Inkling 2 Mini at 128K context on an M1 Max used 16,332 MiB for weights, 2,282 MiB for the KV cache and 4,712 MiB for compute buffers: 23,326 MiB in total. See the [worked example](worked-example-m1-max-32gb.md#why-the-defaults-ran-out-of-memory).
 
 ## What limits speed
 
@@ -51,13 +51,31 @@ The two phases have different limits:
 - **Prefill** does a lot of math on many tokens at once. More GPU cores make it faster.
 - **Decode** must read every [active parameter](glossary.md#active-parameters) from memory for each new token. More memory bandwidth makes it faster.
 
-So a model with fewer active parameters decodes faster on the same computer. This is why an MoE model with 2.4B active parameters can be four times faster than a dense 27B model of similar file size.
+So a model with fewer active parameters decodes faster on the same computer.
 
-*Measured example:* LFM2.5-24B-A2B reads about 2 GB per token and decodes at 68.9 tok/s on the M1 Max. Dense Qwen3.8-27B reads about 16.5 GB per token and decodes at about 15 tok/s with speculation.
+### Example: two models with the same file size but different speeds
+
+Here are two models from the [worked example](worked-example-m1-max-32gb.md), both measured on the same 32 GB Mac:
+
+- **LFM2.5-24B-A2B** is an [MoE model](glossary.md#dense-vs-moe) (Mixture of Experts). It has 24 billion parameters in total, but for each new token it uses only about 2.4 billion of them: the few "experts" its router picks.
+- **Qwen3.8-27B** is a [dense model](glossary.md#dense-vs-moe). It has 27 billion parameters, and it uses all 27 billion for every new token.
+
+| | LFM2.5-24B-A2B (MoE) | Qwen3.8-27B (dense) |
+| --- | --- | --- |
+| Model file size | 19.5 GB | 17.7 GB |
+| Parameters used for each new token | about 2.4 billion | all 27 billion |
+| Data read from memory for each new token | about 2 GB | about 16.5 GB |
+| Decode speed (measured) | 68.9 tok/s | 11.9 tok/s, or about 15 tok/s with [speculative decoding](glossary.md#speculative-decoding) |
+
+Both files are almost the same size, so both need about the same memory. But for every new token, Qwen must read about eight times more data than LFM. That is why LFM writes its answer about 4.5–6 times faster.
+
+*Analogy:* both models own a library of the same size. The MoE model reads a few chosen books for each token. The dense model reads every book for each token.
 
 You can estimate the best possible decode speed:
 
 > decode ceiling (tok/s) ≈ memory bandwidth (GB/s) ÷ GB read per token
+
+*Example:* the M1 Max has about 353 GB/s of memory bandwidth (measured). Qwen3.8-27B reads about 16.5 GB per token. 353 ÷ 16.5 ≈ 21 tok/s at best. Find your own chip's memory bandwidth in its specifications.
 
 Real engines reach 25–60% of this ceiling in the worked examples. The ceiling tells you how much room is left for tuning.
 
@@ -65,11 +83,11 @@ Real engines reach 25–60% of this ceiling in the worked examples. The ceiling 
 
 A model file works only with an engine that supports its **architecture** (how its layers are built) and its **format** (GGUF or MLX). A successful download does not prove that the file will run. Some new models need a special engine build for a few weeks.
 
-*Measured example:* mainline llama.cpp loaded the Inkling 2 Mini GGUF but wrote gibberish. The Unsloth build `b12588-mix-c0c3de8` gave correct output.
+*Measured example:* the official llama.cpp ([mainline](glossary.md#build-mainline-and-fork)) loaded the Inkling 2 Mini GGUF file but wrote gibberish. Unsloth's version of llama.cpp, [build](glossary.md#build-mainline-and-fork) `b12588-mix-c0c3de8`, gave correct output.
 
 ## Check your understanding
 
-- Why does a 26.4B MoE model need memory for 26.4B parameters when only 3.4B are active per token?
+- Inkling 2 Mini is an MoE model with 26.4B parameters. It uses only 3.4B of them for each token. Why does it need memory for all 26.4B?
 - Which phase gets faster with more GPU cores, and which gets faster with more memory bandwidth?
 - Name the three parts of the GPU memory budget that the server log reports.
 

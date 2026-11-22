@@ -8,7 +8,7 @@ Short answers to common beginner questions, then fixes for common problems. Term
 
 ### Do I need a GPU?
 
-No, but it helps a lot. A model can run on the CPU only, but decode is slow. An Apple silicon Mac uses its built-in GPU through Metal. A PC with an NVIDIA or AMD card is fast when the model fits in the card's VRAM.
+No, but it helps a lot. A model can run on the CPU only, but decode is slow. An Apple silicon Mac uses its built-in GPU through Metal, Apple's GPU system. A PC with an NVIDIA or AMD card is fast when the model fits in the card's own memory ([VRAM](glossary.md#unified-memory)).
 
 ### How much memory do I need?
 
@@ -24,11 +24,11 @@ The model has 26.4 billion parameters in total, and uses 3.4 billion for each to
 
 ### Which quant should I download?
 
-Start with a 4-bit quant such as `Q4_K_M` or Unsloth's `UD-Q4_K_XL`. Use a larger one if it fits with room for context. See [Step 2](2-plan.md#4-choose-a-quant).
+A **quant** is a smaller, [quantized](glossary.md#quantization) copy of a model. Start with a 4-bit quant such as [`Q4_K_M`](glossary.md#q4_k_m) or Unsloth's [`UD-Q4_K_XL`](glossary.md#ud-q4_k_xl). Use a larger one if it fits with room for context. See [Step 2](2-plan.md#4-choose-a-quant).
 
 ### GGUF or MLX?
 
-GGUF runs in llama.cpp on almost any hardware. MLX runs only on Apple silicon. On a Mac, try both if the model has both: in the worked example, MLX was faster for some models and prompt lengths, and llama.cpp reached longer context. Use the engine and build that the model card or quant maker names.
+GGUF runs in llama.cpp on almost any hardware. MLX runs only on Apple silicon. On a Mac, try both if the model has both: in the worked example, MLX was faster for some models and prompt lengths, and llama.cpp reached longer context. Use the engine and [build](glossary.md#build-mainline-and-fork) that the model card or the maker of the file (for example Unsloth) names.
 
 ### Why is the first answer slow when I paste a long document?
 
@@ -36,7 +36,7 @@ The model must read the whole prompt first. This is [prefill](glossary.md#prefil
 
 ### Is 20 tok/s good?
 
-For one person chatting, yes. About 10 tok/s is near reading speed. But tok/s does not measure answer quality or how long the answer is. A model that thinks for 15,000 tokens is slow to finish even at a good tok/s.
+For one person chatting, yes. About 10 tok/s is near reading speed. But tok/s does not measure answer quality or how long the answer is. A [thinking model](glossary.md#thinking-model) that reasons for 15,000 tokens is slow to finish even at a good tok/s.
 
 ### Does a bigger context window cost anything if I do not use it?
 
@@ -62,18 +62,18 @@ You can with `sudo sysctl iogpu.wired_limit_mb=…`, but it leaves less memory f
 
 | Symptom | Likely cause | What to do |
 | --- | --- | --- |
-| Server stops at load or "warmup" with `failed to allocate`, `Insufficient Memory` or similar | [OOM](glossary.md#oom): weights + KV cache + compute buffers exceed the budget | Read the `buffer size` lines. Use `-ctk q8_0 -ctv q8_0`, `-ub 256`, a smaller `-c` or a smaller quant. Close other apps. See [Step 5](5-optimise.md#1-make-it-fit). |
-| `unknown model architecture` or another load error | The engine is too old or the wrong build for this model | Use the build that the model card or quant maker names. |
-| The model loads but writes gibberish | Engine and file do not match, or a kernel bug | Check the build and the file layout. Inkling 2 Mini needed Unsloth's build. See [why that build](worked-example-m1-max-32gb.md#why-that-build). |
+| Server stops at load or at "warmup" (its first test pass) with `failed to allocate`, `Insufficient Memory` or similar | [OOM](glossary.md#oom): weights + KV cache + compute buffers exceed the budget | Read the `buffer size` lines. Use `-ctk q8_0 -ctv q8_0`, `-ub 256`, a smaller `-c` or a smaller quant. Close other apps. See [Step 5](5-optimise.md#1-make-it-fit). |
+| `unknown model architecture` or another load error | The engine is too old or the wrong build for this model | Use the [build](glossary.md#build-mainline-and-fork) that the model card or the maker of the file (for example Unsloth) names. |
+| The model loads but writes gibberish | Engine and file do not match, or a [kernel](glossary.md#kernel) bug | Check the build and the file layout. Inkling 2 Mini needed Unsloth's build. See [why that build](worked-example-m1-max-32gb.md#why-that-build). |
 | Out of memory only on long prompts | The KV cache or prefill buffers grow with the prompt | Use q8_0 KV and a smaller `-ub` (llama.cpp) or `--prefill-step-size 256` (MLX). Lower `-c`. |
 | Answers stop in the middle | The token limit is too low | Raise `max_tokens` in the request. For `mlx_lm.server`, set `--max-tokens`; the default is 512. |
-| Answers are repetitive or strange | Wrong sampling or chat template | Use the model card's sampling. For llama.cpp, add `--jinja`. |
+| Answers are repetitive or strange | Wrong sampling or [chat template](glossary.md#chat-template-and-tool-calls) | Use the model card's sampling. For llama.cpp, add `--jinja`. |
 | Decode slows down over a long session | Other apps, swap growth or heat | Close apps, stay on AC power, watch swap in Activity Monitor. Compare with control runs. |
 | Very slow decode on a GPU computer | Some layers run on the CPU | Check that all layers are on the GPU (`-ngl 99`) and that the model fits in VRAM. |
-| `Thread group size (…) is greater than the maximum allowed` | A custom kernel needs a newer Apple GPU | Use another engine or quant. See [LookAtMyQuant](worked-example-m1-max-32gb.md#lookatmyquant). |
+| `Thread group size (…) is greater than the maximum allowed` | A custom [kernel](glossary.md#kernel) needs a newer Apple GPU | Use another engine or quant. See [LookAtMyQuant](worked-example-m1-max-32gb.md#lookatmyquant). |
 | API request uses the wrong model | The `model` field does not match the server | Call `/v1/models` and copy the exact ID. |
 | `curl: (7) Failed to connect` | The server is not ready, or the port is wrong | Check the server log in tmux. Wait for the listening message. Check the port. |
 | Another computer cannot connect | Server bound to `127.0.0.1`, or a firewall | Use `--host 0.0.0.0` on a trusted network and allow the port in the firewall. |
-| The download finished but the file will not load | Partial or wrong file | Compare the file's sha256 with the value on Hugging Face. Download again. |
+| The download finished but the file will not load | Partial or wrong file | Compare the file's [sha256 checksum](glossary.md#revision-and-checksum-sha256) with the value on [Hugging Face](glossary.md#hugging-face). Download again. |
 
 Still stuck? Read the full reports in [Discussions #3](https://github.com/jellydn/tiny-local-ai/discussions/3), [#4](https://github.com/jellydn/tiny-local-ai/discussions/4) and [#5](https://github.com/jellydn/tiny-local-ai/discussions/5), or ask a question there.
