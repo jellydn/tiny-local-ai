@@ -8,8 +8,11 @@ This repository is a documentation handbook. It contains setup examples and link
 
 ## Choose your starting point
 
+New to local AI? Start with the **[learning base](docs/README.md)**: a step-by-step path from zero, a [glossary](docs/glossary.md) in plain words, a [worked example on an M1 Max 32 GB](docs/worked-example-m1-max-32gb.md) and an [FAQ](docs/faq.md).
+
 | Your goal | Start here | Result |
 | --- | --- | --- |
+| Learn the basics from zero | [Learning base](docs/README.md) | Terms, a memory plan, a running server and fair benchmarks |
 | Chat with a local model | [Run Inkling 2 Mini](#run-inkling-2-mini) | A local web page and API |
 | Check whether your computer can run it | [Hardware](#hardware-and-memory) | A memory plan |
 | Add your documents | [Prompting and retrieval](#before-you-train) | Answers with relevant source text |
@@ -278,6 +281,7 @@ Then change one variable at a time: model width, context, training steps or data
 | File | Purpose |
 | --- | --- |
 | [README.md](README.md) | Beginner handbook, setup examples and learning resources |
+| [docs/](docs/README.md) | Learning base: learning path, glossary, worked example and FAQ |
 | [AGENTS.md](AGENTS.md) | Guidance for maintaining this handbook |
 | [.gitignore](.gitignore) | Excludes local downloads, environments and experiment output |
 | [LICENSE](LICENSE) | Repository licence; model weights and datasets have their own terms |
