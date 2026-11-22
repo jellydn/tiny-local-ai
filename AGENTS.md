@@ -36,7 +36,7 @@ Tiny Local AI is a beginner handbook centered on Inkling 2 Mini. README.md conta
 There is no application build or test suite.
 
 Before committing documentation changes:
-- Check relative file links and section anchors.
+- Check relative file links and section anchors. In an Amp orb, `.agents/setup` installs lychee; run `lychee --offline --include-fragments --no-progress README.md` and add any other changed Markdown files.
 - Check that examples refer to files and external tools that exist.
 - Remove references to deleted helpers and dependencies.
 - Report which checks ran and which runtime examples were not executed.

@@ -26,6 +26,9 @@ __pycache__/
 /out-*/
 *.log
 
+# Amp orb portal registrations
+.amp/portals/*
+
 # Operating system files
 .DS_Store
 Thumbs.db

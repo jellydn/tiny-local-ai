@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Prepare an Amp orb for this documentation repository.
+# The base orb already has git, gh, tmux and python3. This script adds lychee,
+# an offline checker for relative links and section anchors in Markdown.
+set -euo pipefail
+
+LYCHEE_VERSION="0.24.2"
+BIN_DIR="$HOME/.local/bin"
+
+step() { printf '[setup] %s\n' "$*"; }
+
+for tool in git gh tmux python3; do
+	command -v "$tool" >/dev/null || { echo "[setup] missing $tool" >&2; exit 1; }
+done
+
+if "$BIN_DIR/lychee" --version 2>/dev/null | grep -qx "lychee $LYCHEE_VERSION"; then
+	step "lychee $LYCHEE_VERSION already installed"
+else
+	case "$(uname -m)" in
+		x86_64) arch=x86_64 ;;
+		aarch64 | arm64) arch=aarch64 ;;
+		*) echo "[setup] unsupported architecture $(uname -m)" >&2; exit 1 ;;
+	esac
+	asset="lychee-$arch-unknown-linux-gnu.tar.gz"
+	url="https://github.com/lycheeverse/lychee/releases/download/lychee-v$LYCHEE_VERSION/$asset"
+	tmp="$(mktemp -d)"
+	trap 'rm -rf -- "$tmp"' EXIT
+	step "downloading lychee $LYCHEE_VERSION ($arch)"
+	time curl -fsSL --retry 3 -o "$tmp/$asset" "$url"
+	curl -fsSL --retry 3 -o "$tmp/$asset.sha256" "$url.sha256"
+	(cd "$tmp" && echo "$(cut -d' ' -f1 "$asset.sha256")  $asset" | sha256sum -c --quiet)
+	tar -xzf "$tmp/$asset" -C "$tmp"
+	mkdir -p "$BIN_DIR"
+	install -m 0755 "$(find "$tmp" -type f -name lychee | head -n1)" "$BIN_DIR/lychee"
+	step "installed $("$BIN_DIR/lychee" --version)"
+fi
