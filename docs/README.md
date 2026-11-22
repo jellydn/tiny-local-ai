@@ -2,6 +2,8 @@
 
 This is a learning base for people who start from zero. It teaches you how to run an AI model on your own computer, step by step. Every page explains its terms in plain words.
 
+Read it on the [website](https://jellydn.github.io/tiny-local-ai/) or here on GitHub.
+
 **Sources checked: 22 November 2026.** Models and tools change quickly. Check the linked sources before you download large files.
 
 ## Who this is for
@@ -47,4 +49,4 @@ The M1 Max results come from the author's [Discussions #3](https://github.com/je
 
 ## Scope
 
-These pages cover **local inference**: running an existing model on your computer. Fine-tuning and training from scratch are different tasks. The [main handbook](../README.md) introduces them.
+These pages cover **local inference**: running an existing model on your computer. Fine-tuning and training from scratch are different tasks. The [main handbook](https://github.com/jellydn/tiny-local-ai#readme) introduces them.

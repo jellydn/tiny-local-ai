@@ -2,7 +2,7 @@
 
 ## Scope
 
-Tiny Local AI is a beginner handbook centered on Inkling 2 Mini. README.md contains the guide. This repository does not ship an inference application or training pipeline.
+Tiny Local AI is a beginner handbook centered on Inkling 2 Mini. README.md contains the guide. `docs/` contains the beginner learning base, which is readable on GitHub and also builds into a VitePress site for GitHub Pages. This repository does not ship an inference application or training pipeline.
 
 ## Writing
 
@@ -33,10 +33,11 @@ Tiny Local AI is a beginner handbook centered on Inkling 2 Mini. README.md conta
 
 ## Verification
 
-There is no application build or test suite.
+There is no application build or test suite. The only build is the docs site.
 
 Before committing documentation changes:
 - Check relative file links and section anchors. In an Amp orb, `.agents/setup` installs lychee; run `lychee --offline --include-fragments --no-progress README.md` and add any other changed Markdown files.
+- When `docs/` changes, run `bun run docs:build`. It fails on dead links. Keep links in `docs/` relative to pages inside `docs/`, so they work on GitHub and on the site; link to files outside `docs/` with full GitHub URLs. The site uses GitHub-style heading anchors.
 - Check that examples refer to files and external tools that exist.
 - Remove references to deleted helpers and dependencies.
 - Report which checks ran and which runtime examples were not executed.

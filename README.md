@@ -281,7 +281,10 @@ Then change one variable at a time: model width, context, training steps or data
 | File | Purpose |
 | --- | --- |
 | [README.md](README.md) | Beginner handbook, setup examples and learning resources |
-| [docs/](docs/README.md) | Learning base: learning path, glossary, worked example and FAQ |
+| [docs/](docs/README.md) | Learning base: learning path, glossary, worked example and FAQ; also published as a [website](https://jellydn.github.io/tiny-local-ai/) |
+| [package.json](package.json) | VitePress tools that build the website from `docs/` (`bun install`, then `bun run docs:dev` or `bun run docs:build`) |
+| [.github/workflows/deploy-docs.yml](.github/workflows/deploy-docs.yml) | Builds the website on pull requests and deploys it to GitHub Pages from `main` |
+| [.agents/setup](.agents/setup) | Prepares Amp orbs with the link checker and website tools |
 | [AGENTS.md](AGENTS.md) | Guidance for maintaining this handbook |
 | [.gitignore](.gitignore) | Excludes local downloads, environments and experiment output |
 | [LICENSE](LICENSE) | Repository licence; model weights and datasets have their own terms |

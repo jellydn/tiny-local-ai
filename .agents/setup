@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Prepare an Amp orb for this documentation repository.
 # The base orb already has git, gh, tmux and python3. This script adds lychee,
-# an offline checker for relative links and section anchors in Markdown.
+# an offline checker for relative links and section anchors in Markdown, and
+# installs the VitePress docs site dependencies with Bun.
 set -euo pipefail
 
 LYCHEE_VERSION="0.24.2"
@@ -33,4 +34,11 @@ else
 	mkdir -p "$BIN_DIR"
 	install -m 0755 "$(find "$tmp" -type f -name lychee | head -n1)" "$BIN_DIR/lychee"
 	step "installed $("$BIN_DIR/lychee" --version)"
+fi
+
+if command -v bun >/dev/null; then
+	step "installing docs site dependencies"
+	time bun install --frozen-lockfile
+else
+	step "bun not found; skipping docs site dependencies"
 fi
