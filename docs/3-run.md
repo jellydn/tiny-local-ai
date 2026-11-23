@@ -1,8 +1,10 @@
-# Step 3: Run a model
+# Step 3b: Run a model in the terminal
 
 This page takes you from nothing to a working local **server**: a program on your computer that waits for questions and sends back the model's answers. It uses Inkling 2 Mini with llama.cpp on an Apple silicon Mac, the setup from the [worked example](worked-example-m1-max-32gb.md). An MLX path for LFM2.5-24B-A2B follows.
 
-[Back to the learning base](README.md) · Previous: [Step 2: Plan](2-plan.md) · Next: [Step 4: Measure](4-measure.md)
+Want to start without the terminal? Use [Step 3a: Unsloth Desktop](3a-unsloth-desktop.md) first, then come back here for full control over memory settings.
+
+[Back to the learning base](README.md) · Previous: [Step 3a: No-terminal start](3a-unsloth-desktop.md) · Next: [Step 4: Measure](4-measure.md)
 
 > **Not tested for this page.** These commands follow the author's reports and the linked tool documentation. They were not run while this page was written. Check the linked sources if a command fails.
 

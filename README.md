@@ -13,7 +13,8 @@ New to local AI? Start with the **[learning base](docs/README.md)**: a step-by-s
 | Your goal | Start here | Result |
 | --- | --- | --- |
 | Learn the basics from zero | [Learning base](docs/README.md) | Terms, a memory plan, a running server and fair benchmarks |
-| Chat with a local model | [Run Inkling 2 Mini](#run-inkling-2-mini) | A local web page and API |
+| Chat with a local model, no terminal | [No-terminal start with Unsloth Desktop](docs/3a-unsloth-desktop.md) | A chat app, optionally shared on your home network |
+| Chat with a local model from the terminal | [Run Inkling 2 Mini](#run-inkling-2-mini) | A local web page and API |
 | Check whether your computer can run it | [Hardware](#hardware-and-memory) | A memory plan |
 | Add your documents | [Prompting and retrieval](#before-you-train) | Answers with relevant source text |
 | Change response style or task behaviour | [Fine-tuning](#fine-tuning-inkling-2-mini) | An evaluated adapter |
@@ -131,7 +132,9 @@ For a first try, use the short-context Mini setup below. Move to the 128K setup 
 
 ## Run Inkling 2 Mini
 
-These steps are short. [Step 3 of the learning base](docs/3-run.md) has the same setup with every command and flag explained.
+These steps are short. [Step 3b of the learning base](docs/3-run.md) has the same setup with every command and flag explained.
+
+**Prefer not to use the terminal?** [Step 3a: No-terminal start with Unsloth Desktop](docs/3a-unsloth-desktop.md) installs an app, downloads `UD-Q4_K_XL` from a drop-down list, sets the context size and can share the model on your home network. It is the easiest first try. The terminal path below gives full control over memory settings, which a 32 GB Mac needs for 128K context.
 
 ### 1. Select a matching runtime and GGUF
 
@@ -139,7 +142,7 @@ Unsloth is a company that makes quantized copies of models and shares them on [H
 
 **The engine and the file must match.** The GGUF files at the top of that repository need Unsloth's own llama.cpp, build `b12588-mix-c0c3de8`. The official llama.cpp ([mainline](docs/glossary.md#build-mainline-and-fork)) needs the different files in the [Mainline_Support folder](https://huggingface.co/unsloth/Inkling-2-Mini-GGUF/blob/main/Mainline_Support/README.md). Do not use a file from one path with the engine from the other.
 
-If you prefer an app to the terminal, follow the guide's Unsloth Desktop steps. The terminal example below uses the Unsloth build, text only, with no speculative-decoding helper. It follows the documentation; it was not tested for this handbook.
+If you prefer an app to the terminal, see [Step 3a](docs/3a-unsloth-desktop.md) or the guide's Unsloth Desktop steps. The terminal example below uses the Unsloth build, text only, with no speculative-decoding helper. It follows the documentation; it was not tested for this handbook.
 
 ### 2. Prepare the folder
 

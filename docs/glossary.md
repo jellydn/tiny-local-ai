@@ -97,7 +97,7 @@ Normal attention keeps a [KV cache](#kv-cache) entry for every earlier token, so
 
 A quantized model file is often called a **quant**. Its name tells you roughly how many bits each weight uses: Q8 is about 8 bits, Q4 about 4 bits, and IQ1 about 1 bit.
 
-*Analogy:* a photo saved as a smaller JPEG. It looks almost the same, but some detail is gone.
+*Analogy:* a photo stored with fewer bits per pixel. It looks almost the same, but some detail is gone. [Step 2](2-plan.md#a-picture-of-quantization) shows a picture of this.
 
 ### Bits per weight (bpw)
 
@@ -338,6 +338,24 @@ These words come from software projects on GitHub:
 ### mlx-lm
 
 **mlx-lm** is Apple's engine for text models in MLX format. `mlx_lm.server` serves an API. It runs only on Apple silicon.
+
+### MTPLX
+
+**MTPLX** is an engine for Apple silicon, built on MLX. It uses a model's built-in [MTP](#mtp-multi-token-prediction) head for speculative decoding, and serves an OpenAI-compatible API with `mtplx serve`.
+
+*Example:* on the M1 Max, MTPLX v2.13.1 with MTP decoded Qwen3.8-27B at about 30 tok/s up to 8K tokens, but it failed at 50K. See the [worked example](worked-example-m1-max-32gb.md#newer-result-mtplx-with-mtp).
+
+### Unsloth Desktop
+
+**Unsloth Desktop** is a free, open-source app from Unsloth for macOS, Windows and Linux. It downloads models, runs them with a built-in engine and shows a chat window, so you do not need the terminal. It can also share the model on your home network with [LAN access](#lan-access).
+
+*Example:* [Step 3a](3a-unsloth-desktop.md) runs Inkling 2 Mini `UD-Q4_K_XL` in the app.
+
+### LAN access
+
+A **LAN** (local area network) is the network in your home or office: the devices on the same Wi-Fi or wired router. **LAN access** lets those devices use a server on your computer. Nothing goes to the internet, but anyone on the same network can reach the server, so protect it with a password.
+
+*Example:* in Unsloth Desktop, Settings → Remote & LAN → **Start** shows an address such as `http://192.168.1.42:8888`. Other devices open it and sign in as `unsloth`. See [Step 3a](3a-unsloth-desktop.md#4-optional-share-it-on-your-home-network).
 
 ### mlx-vlm
 

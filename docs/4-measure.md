@@ -2,7 +2,7 @@
 
 A model that loads is not yet a model that works well. This page shows how to measure speed, memory and quality, and how to compare two setups fairly.
 
-[Back to the learning base](README.md) · Previous: [Step 3: Run a model](3-run.md) · Next: [Step 5: Optimise](5-optimise.md)
+[Back to the learning base](README.md) · Previous: [Step 3b: Run a model in the terminal](3-run.md) · Next: [Step 5: Optimise](5-optimise.md)
 
 ## What to measure
 
@@ -21,7 +21,7 @@ Measure prefill and decode separately. One "tok/s" number without a phase is not
 
 When llama.cpp starts, it prints one line for each buffer it allocates. Search the log for `buffer size`. Add the lines that name the GPU and skip the lines that name the CPU. On a Mac the GPU lines say **Metal** (Apple's GPU system); on an NVIDIA card they say **CUDA**.
 
-If the server runs in the tmux session from [Step 3](3-run.md#3-start-the-server-with-a-short-context), this prints those lines:
+If the server runs in the tmux session from [Step 3b](3-run.md#3-start-the-server-with-a-short-context), this prints those lines:
 
 ```bash
 tmux capture-pane -p -t tiny-local-ai -S -400 | grep -E 'recommendedMaxWorkingSetSize|buffer size'

@@ -14,9 +14,13 @@ No, but it helps a lot. A model can run on the CPU only, but decode is slow. An 
 
 Plan for the model file plus room for the KV cache, compute buffers and your other apps. A first rule: a model file no larger than about 60% of a Mac's RAM, or 80% of a GPU's VRAM, with a short context. See [Step 2: Plan](2-plan.md#2-use-the-memory-rule-of-thumb).
 
+### Can I start without the terminal?
+
+Yes. Install the free Unsloth Desktop app, pick a model from its list and chat. See [Step 3a: No-terminal start](3a-unsloth-desktop.md). Use the terminal path in [Step 3b](3-run.md) when you need full control over memory settings.
+
 ### Which model should I start with?
 
-One that fits easily and is supported by a common engine. On a 32 GB Mac, the [worked example](worked-example-m1-max-32gb.md) shows three models that fit at 128K context. On a smaller machine, pick a smaller model and a 4-bit quant.
+One that fits easily and is supported by a common engine. On a 32 GB Mac, the [worked example](worked-example-m1-max-32gb.md) shows three models that fit at 128K context. On a smaller machine, pick a smaller model and a 4-bit quant. The [memory size table](2-plan.md#which-model-for-your-memory-size) gives a starting point for each memory size.
 
 ### What does "26.4B / 3.4B active" mean?
 
@@ -28,7 +32,7 @@ A **quant** is a smaller, [quantized](glossary.md#quantization) copy of a model.
 
 ### GGUF or MLX?
 
-GGUF runs in llama.cpp on almost any hardware. MLX runs only on Apple silicon. On a Mac, try both if the model has both: in the worked example, MLX was faster for some models and prompt lengths, and llama.cpp reached longer context. Use the engine and [build](glossary.md#build-mainline-and-fork) that the model card or the maker of the file (for example Unsloth) names.
+GGUF runs in llama.cpp on almost any hardware. MLX runs only on Apple silicon. On a Mac, try both if the model has both: in the worked example, MLX was faster for some models and prompt lengths, and llama.cpp reached longer context. Use the engine and [build](glossary.md#build-mainline-and-fork) that the model card or the maker of the file (for example Unsloth) names. The [Mac notes](worked-example-m1-max-32gb.md#mac-notes) show where "use MLX on a Mac" did not hold.
 
 ### Why is the first answer slow when I paste a long document?
 
@@ -52,7 +56,7 @@ Yes, after you download the engine and the model. The server runs on your comput
 
 ### Can other computers use my server?
 
-Yes, on a trusted network. Start the server with `--host 0.0.0.0` and use your computer's private IP address. The example server has no password, so never expose its port to the internet.
+Yes, on a trusted network. Start the server with `--host 0.0.0.0` and use your computer's private IP address. The example server has no password, so never expose its port to the internet. Unsloth Desktop has a built-in [LAN access](glossary.md#lan-access) option with a password; see [Step 3a](3a-unsloth-desktop.md#4-optional-share-it-on-your-home-network).
 
 ### Is it safe to raise the Mac GPU memory limit?
 
@@ -70,7 +74,7 @@ You can with `sudo sysctl iogpu.wired_limit_mb=…`, but it leaves less memory f
 | Answers are repetitive or strange | Wrong sampling or [chat template](glossary.md#chat-template-and-tool-calls) | Use the model card's sampling. For llama.cpp, add `--jinja`. |
 | Decode slows down over a long session | Other apps, swap growth or heat | Close apps, stay on AC power, watch swap in Activity Monitor. Compare with control runs. |
 | Very slow decode on a GPU computer | Some layers run on the CPU | Check that all layers are on the GPU (`-ngl 99`) and that the model fits in VRAM. |
-| `Thread group size (…) is greater than the maximum allowed` | A custom [kernel](glossary.md#kernel) needs a newer Apple GPU | Use another engine or quant. See [LookAtMyQuant](worked-example-m1-max-32gb.md#lookatmyquant). |
+| `Thread group size (…) is greater than the maximum allowed` | A custom [kernel](glossary.md#kernel) needs a newer Apple GPU | Update the engine; a newer version may have a fix for older chips. Otherwise use another engine or quant. See [LookAtMyQuant](worked-example-m1-max-32gb.md#lookatmyquant). |
 | API request uses the wrong model | The `model` field does not match the server | Call `/v1/models` and copy the exact ID. |
 | `curl: (7) Failed to connect` | The server is not ready, or the port is wrong | Check the server log in tmux. Wait for the listening message. Check the port. |
 | Another computer cannot connect | Server bound to `127.0.0.1`, or a firewall | Use `--host 0.0.0.0` on a trusted network and allow the port in the firewall. |
