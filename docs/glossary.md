@@ -4,7 +4,7 @@ Each term has a short explanation and an example. The examples use the [M1 Max 3
 
 [Back to the learning base](README.md)
 
-**Jump to:** [Model basics](#model-basics) · [Model files and quantization](#model-files-and-quantization) · [Memory](#memory) · [Speed](#speed) · [Speculative decoding](#speculative-decoding) · [Engines and servers](#engines-and-servers) · [Quality](#quality) · [Testing and sharing results](#testing-and-sharing-results)
+**Jump to:** [Model basics](#model-basics) · [Model files and quantization](#model-files-and-quantization) · [Memory](#memory) · [Speed](#speed) · [Speculative decoding](#speculative-decoding) · [Engines and servers](#engines-and-servers) · [Quality](#quality) · [Fine-tuning](#fine-tuning) · [Testing and sharing results](#testing-and-sharing-results)
 
 ## Model basics
 
@@ -389,6 +389,64 @@ A **needle test** hides a fact, such as a 5-digit code, in a long document and a
 ### Sampling settings
 
 **Sampling** decides how the model picks each token from its predictions. **Temperature** controls randomness: 0 always picks the most likely token; 1.0 follows the model's probabilities. **top-p**, **top-k** and **min-p** remove unlikely tokens. **Repetition penalty** makes the model less likely to repeat the same words. Use the values from the model card, and keep them fixed when you compare.
+
+## Fine-tuning
+
+[Step 6](6-fine-tune.md) uses these terms.
+
+### Full fine-tuning
+
+**Full fine-tuning** trains every weight of the model. It can change the model the most, but it needs the most memory: the trainer must store the weights, a change for each weight and extra numbers for each one. Beginners usually start with [LoRA](#lora) instead.
+
+*Example:* Unsloth reports that full fine-tuning of all 26B Inkling 2 Mini weights with a common optimizer needs about 98 GB just for the weights and their changes (source-reported).
+
+### LoRA
+
+**LoRA** (low-rank adaptation) keeps the original weights frozen and trains a small set of new weights next to some layers. Only the new weights change, so training needs much less memory and the result is a small file.
+
+*Example:* `mlx_lm.lora` trains LoRA by default. With its default settings, it adds new weights to 16 layers of the model.
+
+### QLoRA
+
+**QLoRA** is LoRA on a 4-bit [quantized](#quantization) copy of the model. The frozen weights take about a quarter of the memory of 16-bit weights, so a larger model fits. The new LoRA weights still train at higher precision.
+
+*Example:* Unsloth loads Inkling 2 Mini in 4 bits for QLoRA: the model takes 14.5 GiB after loading instead of 47.8 GiB (source-reported).
+
+### Adapter
+
+An **adapter** is the file of new weights that LoRA or QLoRA trains. It is useless alone: you load it together with the exact base model it was trained on. One base model can have many adapters, one for each task.
+
+*Example:* `mlx_lm.server --adapter-path outputs/ticket-json/adapters` serves the base model with the adapter added.
+
+### Dataset and chat format
+
+The **dataset** is the list of examples that the model learns from. For chat models it is usually a JSONL file: one example per line, each a list of `user` and `assistant` messages. This is the **chat format**. The trainer turns each example into text with the model's [chat template](#chat-template-and-tool-calls). Use the same template for training and for use, or the model sees a format it did not learn.
+
+### Train on responses only
+
+**Train on responses only** means the trainer counts only the assistant's answer when it measures how wrong the model is (the **loss**). The user's question is still input, but the model does not learn to write questions. This usually gives better answers from the same data.
+
+*Example:* mlx-lm calls it `--mask-prompt`. Unsloth calls it `train_on_responses_only`.
+
+### Eval split
+
+The **eval split** is the part of your examples that you keep out of training, to check the model on examples it has never seen. Usually there are two: a **validation** set that you check during training, and a **test** set that you check once at the end. If eval examples leak into training, the score is too high.
+
+### Overfitting
+
+**Overfitting** is when the model memorises its training examples instead of learning the task. You see it when the training loss keeps falling but the validation loss rises. Fewer training steps or more varied examples help.
+
+### Merge
+
+To **merge** (or fuse) is to add the adapter's weights into the base model's weights. The result is one normal model that needs no adapter, so any engine can run it. You can then quantize it, for example to a [GGUF](#gguf) file.
+
+*Example:* Unsloth merges an Inkling 2 Mini adapter into a 53 GB 16-bit model before it writes a 4-bit GGUF file (source-reported). mlx-lm uses the `mlx_lm.fuse` command.
+
+### Distillation
+
+**Distillation** means training a small model on answers written by a bigger model (the **teacher**). The small model learns to copy the teacher on one task, and then runs faster and in less memory. Check the teacher model's licence first: some licences do not allow training other models on its output.
+
+*Example:* ask a large model to turn 1,000 support tickets into JSON, check the answers, then fine-tune a 1–2B model on them.
 
 ## Testing and sharing results
 

@@ -235,6 +235,8 @@ Before any training, measure how the unchanged model does (your **baseline**). K
 
 ## Fine-tuning Inkling 2 Mini
 
+New to fine-tuning? Start with [Step 6: Fine-tune](docs/6-fine-tune.md) in the learning base. It helps you decide whether you need fine-tuning at all. Then it shows two paths: a small model trained on a Mac with mlx-lm, and Inkling 2 Mini trained with QLoRA in Unsloth's Colab notebook and run on a Mac. Nobody has tested either path on this hardware yet.
+
 ### Official hosted path: Tinker
 
 Tinker is Thinking Machines' hosted training service. The [official Tinker Cookbook](https://github.com/thinking-machines-lab/tinker-cookbook) supports `thinkingmachines/Inkling-2-Mini`. It includes the Mini-specific code that turns chat messages into the model's text format (the **renderer**) and splits text into tokens (the **tokenizer**). It has examples of supervised fine-tuning and other training after pretraining.
@@ -262,7 +264,7 @@ Start with short, correct examples. Do not add private data to a hosted service 
 
 ### Local fine-tuning
 
-This repository has **no tested recipe for fine-tuning Mini on your own computer**. A GGUF file is made for running a model, not for training it. Mini's looped layers, experts and mixed 4-bit/8-bit formats need a training program that supports them on purpose.
+This repository has **no tested recipe for fine-tuning Mini on your own computer**. [Step 6](docs/6-fine-tune.md#why-not-train-inkling-on-a-32-gb-m1) explains why a 32 GB Mac cannot train it, and it gives a small-model path that runs fully on the Mac. A GGUF file is made for running a model, not for training it. Mini's looped layers, experts and mixed 4-bit/8-bit formats need a training program that supports them on purpose.
 
 Before you train locally, confirm that your training program supports Mini's design and file format, which layers get the adapter, how much memory training needs, and how to save the result. First prove that a tiny run can save, load again and improve a test task. Training needs much more memory than the 17.63 GB file suggests.
 

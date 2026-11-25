@@ -12,7 +12,7 @@ You can use a terminal and copy commands. You do not need to know how AI models 
 
 ## The learning path
 
-Follow the five steps in order. Each step answers one question. Step 3 has two paths: start with the app (3a) if you are new, and use the terminal (3b) when you need more control.
+Follow the five steps in order. Each step answers one question. Step 3 has two paths: start with the app (3a) if you are new, and use the terminal (3b) when you need more control. Step 6 is optional: most people never need it.
 
 ```mermaid
 flowchart LR
@@ -21,6 +21,7 @@ flowchart LR
     C --> D["4. Measure<br/>How fast? How good?<br/>How much memory?"]
     D --> E["5. Optimise<br/>Change one setting,<br/>measure again"]
     E -.->|"next idea"| D
+    E -.->|"optional"| F["6. Fine-tune<br/>Teach it one narrow task,<br/>measure again"]
 ```
 
 | Step | What you do in plain words | Page |
@@ -31,6 +32,7 @@ flowchart LR
 | 3b. Run a model in the terminal | Type the commands: install the program, download the model, start it and ask it a question. Gives full control over memory. | [Run a model](3-run.md) |
 | 4. Measure | Check how fast it answers, how much memory it uses and whether its answers are correct. | [Measure](4-measure.md) |
 | 5. Optimise | Change one setting at a time and keep only the changes that make it better. | [Optimise](5-optimise.md) |
+| 6. Fine-tune (optional) | Decide whether you need training at all. If you do, train a small adapter for one narrow task and compare it with the original model. | [Fine-tune](6-fine-tune.md) |
 
 ## Reference pages
 
@@ -52,4 +54,4 @@ The no-terminal page, the memory size table and the quantization picture use Jer
 
 ## Scope
 
-These pages cover **local inference**: running an existing model on your computer. Fine-tuning and training from scratch are different tasks. The [main handbook](https://github.com/jellydn/tiny-local-ai#readme) introduces them.
+Steps 1–5 cover **local inference**: running an existing model on your computer. [Step 6](6-fine-tune.md) covers fine-tuning: a small model trained on your Mac, or Inkling 2 Mini trained in the cloud and run on your Mac. Training a model from scratch is a different task. The [main handbook](https://github.com/jellydn/tiny-local-ai#train-a-small-model-from-scratch) introduces it.

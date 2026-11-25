@@ -40,6 +40,7 @@ export default withMermaid(
 						{ text: "3b. Run a model (terminal)", link: "/3-run" },
 						{ text: "4. Measure", link: "/4-measure" },
 						{ text: "5. Optimise", link: "/5-optimise" },
+						{ text: "6. Fine-tune (optional)", link: "/6-fine-tune" },
 					],
 				},
 				{

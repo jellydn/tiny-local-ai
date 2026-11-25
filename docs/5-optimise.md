@@ -2,7 +2,7 @@
 
 Optimising means changing one setting, measuring again and keeping only real gains. This page lists the settings to try, in order, and what the worked examples found.
 
-[Back to the learning base](README.md) · Previous: [Step 4: Measure](4-measure.md)
+[Back to the learning base](README.md) · Previous: [Step 4: Measure](4-measure.md) · Next (optional): [Step 6: Fine-tune](6-fine-tune.md)
 
 ## Work in this order
 
@@ -87,3 +87,5 @@ Record the final launch and the changes that did not help. The next person saves
 
 - [Worked example: three models on an M1 Max 32 GB](worked-example-m1-max-32gb.md)
 - [inference-optimisation-skill](https://github.com/sybil-solutions/inference-optimisation-skill), the method the worked examples used
+
+Next (optional): [Step 6: Fine-tune](6-fine-tune.md)
